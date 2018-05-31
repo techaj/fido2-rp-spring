@@ -15,7 +15,7 @@ Gradle available on the class path. We have been using version 4.4.
 
 Ideally you would also have a FIDO2 authenticator. We have used  [Yubico Security Key](https://www.yubico.com/product/security-key-by-yubico/).
 
-We are open to collaboration, if you have FIDO2 authenticator we would like to hear from you.
+**We are open to collaboration, if you have FIDO2 authenticator we would like to hear from you.**
 
 
 Webauthn/FIDO2.0 enabled browser. For a full list of supported browsers see [browser compatibility matrix](https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API). 
