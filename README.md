@@ -15,8 +15,11 @@ Gradle available on the class path. We have been using version 4.4.
 
 Ideally you would also have a FIDO2 authenticator. We have used  [Yubico Security Key](https://www.yubico.com/product/security-key-by-yubico/).
 
+We are open to collaboration, if you have FIDO2 authenticator we would like to hear from you.
+
+
 Webauthn/FIDO2.0 enabled browser. For a full list of supported browsers see [browser compatibility matrix](https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API). 
-We have tested with Firefox 59 and 60, and Chrome nightly.
+We have tested with Firefox 60, and Chrome nightly.
 
 Webauthn only works with SecureContext so you might need to generate and configure appropriate certificates and enable TLS. 
 See [Generate root cert](generate_keystore.sh) and [Generate RP cert](generate_springboot_keystore.sh) for instructions on how to generate root cert and SSL cert.     
