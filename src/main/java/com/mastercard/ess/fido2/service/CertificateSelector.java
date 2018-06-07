@@ -36,11 +36,11 @@ public class CertificateSelector {
             switch(certificate.getIssuerDN().getName()){
                 case "CN=Yubico U2F Root CA Serial 457200631": return (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new FileInputStream(new File(certsLocation+"yubico-u2f-ca-certs.crt")));
                 default:
-                    throw new RuntimeException("Can't find certificate");
+                    throw new Fido2RPRuntimeException("Can't find certificate");
             }
         } catch (CertificateException | FileNotFoundException e) {
             LOGGER.info("Problem {} ", e.getMessage());
-            throw new RuntimeException(e);
+            throw new Fido2RPRuntimeException("Can't validate certificate");
         }
 
     }

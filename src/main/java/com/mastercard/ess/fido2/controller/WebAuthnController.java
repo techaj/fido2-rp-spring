@@ -24,6 +24,7 @@ import com.mastercard.ess.fido2.database.RegistrationStatus;
 import com.mastercard.ess.fido2.service.AuthenticatorAssertionVerifier;
 import com.mastercard.ess.fido2.service.AuthenticatorAttestationVerifier;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
+import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -126,7 +127,7 @@ public class WebAuthnController {
         try {
             clientDataJSONNode = om.readTree(new String(base64UrlDecoder.decode(params.get("response").get("response").get("clientDataJSON").asText()),Charset.forName("UTF-8")));
         } catch (IOException e) {
-            new RuntimeException(e);
+            new Fido2RPRuntimeException("Can't parse message");
         }
         String keyId = response.get("id").asText();
 
@@ -135,7 +136,7 @@ public class WebAuthnController {
 
         LOGGER.info("userId  {} challenge {} {} {}", userId,challenge,clientDataChallenge,clientDataOrigin);
         if(!challenge.equals(clientDataChallenge)){
-            throw new RuntimeException("Challenges don't match");
+            throw new Fido2RPRuntimeException("Challenges don't match");
         }
 
         List<FIDO2RegistrationEntity> registrations = registrationsRepository.findAllByUserId(userId);
@@ -143,7 +144,7 @@ public class WebAuthnController {
                 .filter(f -> verifyChallenge(f.getChallenge(),challenge,clientDataChallenge))
                 .filter(f-> verifyDomain(f.getDomain(),clientDataOrigin))
                 .findAny()
-                .orElseThrow(() -> new RuntimeException("Can't find request with matching id and challenge"));
+                .orElseThrow(() -> new Fido2RPRuntimeException("Can't find request with matching id and challenge"));
 
 
         CredAndCounterData attestationData = authenticatorAttestationVerifier.verifyAuthenticatorAttestationResponse(response,credentialFound.getDomain());
@@ -184,7 +185,7 @@ public class WebAuthnController {
 
         for(FIDO2RegistrationEntity registration :registrations) {
             if(StringUtils.isEmpty(registration.getPublicKeyId())) {
-                throw new RuntimeException("Can't find associated key. Have you registered");
+                throw new Fido2RPRuntimeException("Can't find associated key. Have you registered");
             }
             ObjectNode publicKeyCredentialDescriptorNode = publicKeyCredentialDescriptors.addObject();
             publicKeyCredentialDescriptorNode.put("type","public-key");
@@ -219,11 +220,13 @@ public class WebAuthnController {
         try {
             clientDataJSONNode = om.readTree(new String(base64UrlDecoder.decode(params.get("response").get("response").get("clientDataJSON").asText()),Charset.forName("UTF-8")));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new Fido2RPRuntimeException("Can't parse message");
+        }catch (Exception e) {
+            throw new Fido2RPRuntimeException("Invalid assertion data");
         }
 
 
-        FIDO2AuthenticationEntity authenticationEntity = authenticationsRepository.findByChallenge(challenge).orElseThrow(() -> new RuntimeException("Can't find matching request"));
+        FIDO2AuthenticationEntity authenticationEntity = authenticationsRepository.findByChallenge(challenge).orElseThrow(() -> new Fido2RPRuntimeException("Can't find matching request"));
 
         String clientDataChallenge  = clientDataJSONNode.get("challenge").asText();
         String clientDataOrigin  = clientDataJSONNode.get("origin").asText();
@@ -232,7 +235,7 @@ public class WebAuthnController {
         verifyDomain(authenticationEntity.getDomain(),clientDataOrigin);
 
         String keyId = response.get("id").asText();
-        FIDO2RegistrationEntity registration = registrationsRepository.findByPublicKeyId(keyId).orElseThrow(()->new RuntimeException("Couldn't find the key"));
+        FIDO2RegistrationEntity registration = registrationsRepository.findByPublicKeyId(keyId).orElseThrow(()->new Fido2RPRuntimeException("Couldn't find the key"));
         authenticatorAuthorizationVerifier.verifyAuthenticatorAssertionResponse(response, registration);
 
         authenticationEntity.setW3cAuthenticatorAssertionResponse(response.toString());
@@ -242,10 +245,10 @@ public class WebAuthnController {
 
     private boolean verifyChallenge(String challengeSent, String challengeReceived, String challengeInClientDataOrigin) {
         if(!challengeReceived.equals(challengeInClientDataOrigin)){
-            throw new RuntimeException("Challenges don't match");
+            throw new Fido2RPRuntimeException("Challenges don't match");
         }
         if(!challengeSent.equals(challengeInClientDataOrigin)){
-            throw new RuntimeException("Challenges don't match");
+            throw new Fido2RPRuntimeException("Challenges don't match");
         }
         return true;
     }
@@ -258,11 +261,11 @@ public class WebAuthnController {
         // but then clientDataOrigin is https://
         try {
             if(!domain.equals(new URL(clientDataOrigin).getHost())){
-                throw new RuntimeException("Domains don't match");
+                throw new Fido2RPRuntimeException("Domains don't match");
             }
             return true;
         } catch (MalformedURLException e) {
-            throw new RuntimeException("Not valid domain");
+            throw new Fido2RPRuntimeException("Not valid domain");
         }
     }
 

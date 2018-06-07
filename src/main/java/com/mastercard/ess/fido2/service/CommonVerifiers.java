@@ -97,7 +97,7 @@ class CommonVerifiers {
         if ((authData.getFlags()[0] & U2F_USER_PRESENTED) == 1) {
             return true;
         } else {
-            throw new RuntimeException("User not present");
+            throw new Fido2RPRuntimeException("User not present");
         }
     }
 
@@ -109,16 +109,16 @@ class CommonVerifiers {
             LOGGER.debug("rpIDHash from Assertion HEX {}", Hex.encodeHexString(retrievedRpIdHash));
             if (!Arrays.equals(retrievedRpIdHash, calculatedRpIdHash)) {
                 LOGGER.warn("hash from domain doesn't match hash from assertion HEX ");
-                throw new RuntimeException("Hashes don't match");
+                throw new Fido2RPRuntimeException("Hashes don't match");
             }
         } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
+            throw new Fido2RPRuntimeException("This encoding is not supported" );
         }
     }
 
     void verifyCounter(int counter, int oldCounter) {
         if(oldCounter < counter) {
-            throw new RuntimeException("Counter did not increase");
+            throw new Fido2RPRuntimeException("Counter did not increase");
         }
 
     }
@@ -132,7 +132,7 @@ class CommonVerifiers {
             LOGGER.info("KeyBytes HEX {}", Hex.encodeHexString(keyBytes));
             return keyBytes;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new Fido2RPRuntimeException("Can't parse public key");
         }
     }
 
@@ -146,11 +146,11 @@ class CommonVerifiers {
             signatureChecker.initVerify(publicKey);
             signatureChecker.update(signatureBase);
             if (!signatureChecker.verify(signature)) {
-                throw new RuntimeException("Unable to verify signature");
+                throw new Fido2RPRuntimeException("Unable to verify signature");
             }
 
         } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
-            throw new RuntimeException(e);
+            throw new Fido2RPRuntimeException("Can't verify the signature");
         }
     }
 }
