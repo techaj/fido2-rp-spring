@@ -79,9 +79,9 @@ public class AuthenticatorAssertionVerifier {
                 registration.setCounter(counter);
 
             } catch (CertificateException e) {
-                throw new RuntimeException(e);
+                throw new Fido2RPRuntimeException("Problem with certificate");
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                throw new Fido2RPRuntimeException("General server error");
             }
         }
 

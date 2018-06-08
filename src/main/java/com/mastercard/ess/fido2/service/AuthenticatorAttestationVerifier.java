@@ -92,18 +92,18 @@ public class AuthenticatorAttestationVerifier {
                         certificateValidator.verifyCert(certificate, certificateSelector.selectRootCertificate(certificate));
                         commonVerifiers.verifyAttestationSignature(authData, clientDataHash, signature, certificate);
                     } catch (CertificateException e) {
-                        throw new RuntimeException(e);
+                        throw new Fido2RPRuntimeException("Problem with certificate");
                     }
                 } else if (attStmt.hasNonNull("ecdaaKeyId")) {
                     String ecdaaKeyId = attStmt.get("ecdaaKeyId").asText();
                     throw new UnsupportedOperationException("TODO");
                 } else {
-                    throw new RuntimeException("Wrong key type");
+                    throw new Fido2RPRuntimeException("Wrong key type");
                 }
             }
             return credIdAndCounters;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new Fido2RPRuntimeException("Problem with processing authenticator data");
         }
 
 

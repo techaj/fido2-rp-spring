@@ -63,7 +63,7 @@ public class CertificateValidator {
 
         } catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | CertificateException e) {
             LOGGER.warn("Cert verification problem {}", e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new Fido2RPRuntimeException("Problem with certificate");
         }
     }
 

@@ -81,7 +81,7 @@ class UncompressedECPointHelper {
     private static String convertCoseCurveToSunCurveName(int curve) {
         switch(curve){
             case 1:return "secp256r1";
-            default: throw new RuntimeException("Unsupported curve");
+            default: throw new Fido2RPRuntimeException("Unsupported curve");
         }
     }
 }
