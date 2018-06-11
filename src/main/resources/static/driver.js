@@ -524,7 +524,7 @@ function processRegisterForm(e) {
 //    let rpid = window.location.origin
     let rpid = document.domain;
     let formBody = {"username": $("#username").val(),"displayName":"dawid","documentDomain":rpid};
-    fetch('/attestation/options', {
+    fetch('attestation/options', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -618,7 +618,7 @@ function processRegisterForm(e) {
         state.createRequest.user.id = base64url.encode(state.createRequest.user.id);
 
         var response = {"request":state.createRequest,"response":publicKeyCredentialToJSON(state.createResponse)};
-        fetch('/attestation/result', {
+        fetch('attestation/result', {
             method: 'POST',
             credentials: 'include',
             headers: {
@@ -656,7 +656,7 @@ function processLoginForm(e) {
     let rpid = document.domain;
     let formBody = {"username": $("#loginUsername").val(), "documentDomain":rpid};
 
-    fetch('/attestation/options', {
+    fetch('attestation/options', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -755,7 +755,7 @@ function processLoginForm(e) {
         state.createRequest.challenge = base64url.encode(state.createRequest.challenge);
 
         var response = {"request":state.createRequest,"response":publicKeyCredentialToJSON(state.assertion)};
-        fetch('/assertion/result', {
+        fetch('assertion/result', {
             method: 'POST',
             credentials: 'include',
             headers: {
