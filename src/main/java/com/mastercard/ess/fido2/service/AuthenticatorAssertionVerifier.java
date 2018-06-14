@@ -17,7 +17,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import java.security.interfaces.ECPublicKey;
 import java.util.Base64;
-import javax.security.cert.CertificateException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
@@ -73,15 +72,12 @@ public class AuthenticatorAssertionVerifier {
                 LOGGER.info("Uncompressed ECpoint node {}", uncompressedECPointNode.toString());
                 LOGGER.info("EC Public key hex {}", Hex.encodeHexString(publicKey));
                 ECPublicKey ecPublicKey = uncompressedECPointHelper.convertUncompressedPointToECKey(publicKey,coseCurveCode);
-                commonVerifiers.verifyAssertionSignature(authData, clientDataHash, signature, ecPublicKey );
+                commonVerifiers.verifyAssertionSignature(authData, clientDataHash, signature, ecPublicKey, registration.getSignatureAlgorithm());
                 int counter = authenticatorDataParser.parseCounter(authData.getCounters());
                 commonVerifiers.verifyCounter(registration.getCounter(), counter);
                 registration.setCounter(counter);
-
-            } catch (CertificateException e) {
-                throw new Fido2RPRuntimeException("Problem with certificate");
             } catch (Exception e) {
-                throw new Fido2RPRuntimeException("General server error");
+                throw new Fido2RPRuntimeException("General server error " + e.getMessage());
             }
         }
 

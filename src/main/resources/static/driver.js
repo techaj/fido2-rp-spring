@@ -523,7 +523,7 @@ function processRegisterForm(e) {
 
 //    let rpid = window.location.origin
     let rpid = document.domain;
-    let formBody = {"username": $("#username").val(),"displayName":"dawid","documentDomain":rpid};
+    let formBody = {"username": $("#username").val(),"displayName":"dawid","documentDomain":rpid,"attestation":""};
     fetch('/attestation/options', {
         method: 'POST',
         credentials: 'include',
