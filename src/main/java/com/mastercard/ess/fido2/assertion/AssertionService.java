@@ -14,6 +14,8 @@ package com.mastercard.ess.fido2.assertion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationEntity;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationRepository;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
@@ -23,12 +25,18 @@ import com.mastercard.ess.fido2.service.ChallengeVerifier;
 import com.mastercard.ess.fido2.service.DomainVerifier;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.Charset;
+import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -53,6 +61,15 @@ class AssertionService {
     @Autowired
     @Qualifier("base64UrlDecoder")
     private Base64.Decoder base64UrlDecoder;
+
+    @Value("${rp.domain}")
+    private String rpDomain;
+
+    JsonNode options(@RequestBody JsonNode params) {
+        LOGGER.info("options {}", params);
+        return retrieveRegistration(params);
+    }
+
 
     JsonNode verify(@RequestBody JsonNode params) {
         LOGGER.info("authenticateResponse {}", params);
@@ -89,4 +106,60 @@ class AssertionService {
         return params;
     }
 
+
+    private JsonNode retrieveRegistration(JsonNode params) {
+        LOGGER.info("authenticate {}", params);
+        String username = params.get("username").asText();
+
+        LOGGER.info("Options {} {}", username);
+
+        ObjectNode credentialRequestOptionsNode = om.createObjectNode();
+        List<FIDO2RegistrationEntity> registrations = registrationsRepository.findAllByUsername(username);
+
+        byte buffer[] = new byte[32];
+        new SecureRandom().nextBytes(buffer);
+
+        String challenge = base64UrlEncoder.encodeToString(buffer);
+        credentialRequestOptionsNode.put("challenge", challenge);
+
+        ObjectNode credentialUserEntityNode = credentialRequestOptionsNode.putObject("user");
+        credentialUserEntityNode.put("name", username);
+
+        ObjectNode publicKeyCredentialRpEntityNode = credentialRequestOptionsNode.putObject("rp");
+        publicKeyCredentialRpEntityNode.put("name", "ACME Dawid");
+        publicKeyCredentialRpEntityNode.put("id", rpDomain);
+        ArrayNode publicKeyCredentialDescriptors = credentialRequestOptionsNode.putArray("allowCredentials");
+
+        for (FIDO2RegistrationEntity registration : registrations) {
+            if (StringUtils.isEmpty(registration.getPublicKeyId())) {
+                throw new Fido2RPRuntimeException("Can't find associated key. Have you registered");
+            }
+            ObjectNode publicKeyCredentialDescriptorNode = publicKeyCredentialDescriptors.addObject();
+            publicKeyCredentialDescriptorNode.put("type", "public-key");
+            ArrayNode authenticatorTransportNode = publicKeyCredentialDescriptorNode.putArray("transports");
+            authenticatorTransportNode.add("usb").add("ble").add("nfc");
+            publicKeyCredentialDescriptorNode.put("id", registration.getPublicKeyId());
+        }
+
+        credentialRequestOptionsNode.put("status", "ok");
+        credentialRequestOptionsNode.put("userVerification", "required");
+
+        String host;
+        try {
+            host = new URL(rpDomain).getHost();
+        } catch (MalformedURLException e) {
+            throw new Fido2RPRuntimeException(e.getMessage());
+        }
+
+        FIDO2AuthenticationEntity entity = new FIDO2AuthenticationEntity();
+        entity.setUsername(username);
+        entity.setChallenge(challenge);
+        entity.setDomain(host);
+        entity.setW3cCredentialRequestOptions(credentialRequestOptionsNode.toString());
+
+        authenticationsRepository.save(entity);
+        credentialRequestOptionsNode.put("status", "ok");
+        credentialRequestOptionsNode.put("errorMessage", "");
+        return credentialRequestOptionsNode;
+    }
 }

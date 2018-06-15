@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.service.processors.AttestationFormatProcessor;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
@@ -37,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -63,11 +63,10 @@ public class CommonVerifiers {
     ObjectMapper cborMapper;
     @Autowired
     Provider provider;
+
     @Autowired
-    @Qualifier("supportedAttestationFormats")
-    List<String> supportedAttestationFormats;
-    @Value("${rp.domain}")
-    private String rpDomain;
+    List<AttestationFormatProcessor> supportedAttestationFormats;
+
 
     public void verifyU2FAttestationSignature(AuthData authData, byte[] clientDataHash, String signature, Certificate certificate, int signatureAlgorithm) {
         int bufferSize = 0;
@@ -269,8 +268,8 @@ public class CommonVerifiers {
     public void verifyOptions(JsonNode params) {
         long count = Arrays.asList(
                 params.hasNonNull("username"),
-                params.hasNonNull("displayName"),
-                params.hasNonNull("attestation")
+                params.hasNonNull("displayName")
+//                params.hasNonNull("attestation")
                 //params.hasNonNull("documentDomain")
         ).parallelStream().filter(f -> f == false).count();
         if (count != 0) {
@@ -310,18 +309,6 @@ public class CommonVerifiers {
         if (origin.isEmpty()) {
             throw new Fido2RPRuntimeException("Invalid client json parameters");
         }
-
-//        String host;
-//        try {
-//            host = new  URL(origin).getHost();
-//        } catch (MalformedURLException e) {
-//            throw new Fido2RPRuntimeException("Origin is not url");
-//        }
-//
-////        if(!rpDomain.equals(host)){
-////            throw new Fido2RPRuntimeException("Domains do not match");
-////        }
-
 
         if (!"webauthn.create".equals(params.get("type").asText())) {
             throw new Fido2RPRuntimeException("Invalid client json parameters");
@@ -441,11 +428,8 @@ public class CommonVerifiers {
 
     public String verifyFmt(JsonNode fmtNode) {
         String fmt = verifyThatString(fmtNode);
-        if (supportedAttestationFormats.contains(fmt)) {
-            return fmt;
-        } else {
-            throw new Fido2RPRuntimeException("Unsupported attestation format " + fmt);
-        }
+        supportedAttestationFormats.stream().filter(f -> f.getAttestationFormat().getFmt().equals(fmt)).findAny().orElseThrow(() -> new Fido2RPRuntimeException("Unsupported attestation format " + fmt));
+        return fmt;
     }
 
     public void verifyAAGUIDZeroed(AuthData authData) {
@@ -462,6 +446,16 @@ public class CommonVerifiers {
             throw new Fido2RPRuntimeException("Invalid TPM Attestation version");
         }
     }
+
+    public String verifyAttestationType(JsonNode params) {
+        if (params.has("attestation")) {
+            return verifyThatString(params.get("attestation"));
+        } else {
+            return "direct";
+        }
+    }
+
+    ;
 }
 
 

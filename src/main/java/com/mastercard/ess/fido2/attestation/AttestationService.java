@@ -16,7 +16,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.mastercard.ess.fido2.database.FIDO2AuthenticationEntity;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationRepository;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationRepository;
@@ -35,7 +34,6 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,14 +72,7 @@ class AttestationService {
 
     JsonNode options(@RequestBody JsonNode params) {
         LOGGER.info("options {}", params);
-        if (!params.has("displayName")) {
-            // we want to retrieve registration only
-            return retrieveRegistration(params);
-        } else {
-            return createNewRegistration(params);
-
-        }
-
+        return createNewRegistration(params);
     }
 
     JsonNode verify(@RequestBody JsonNode params) {
@@ -163,10 +154,9 @@ class AttestationService {
         }
 
 
+        LOGGER.info("Options {} {} {}", username, displayName, documentDomain);
+        String attestationType = commonVerifiers.verifyAttestationType(params);
 
-        LOGGER.info("New registration {} {} {}", username, displayName, documentDomain);
-
-        String attestationType = params.get("attestation").asText();
 
         String credentialType = params.hasNonNull("credentialType") ? params.get("credentialType").asText("public-key") : "public-key";
         ObjectNode credentialCreationOptionsNode = om.createObjectNode();
@@ -218,54 +208,6 @@ class AttestationService {
         return credentialCreationOptionsNode;
     }
 
-    private JsonNode retrieveRegistration(JsonNode params) {
-        LOGGER.info("authenticate {}", params);
-        String username = params.get("username").asText();
-        String documentDomain = params.get("documentDomain").asText();
 
-        LOGGER.info("Registration {} {}", username, documentDomain);
-
-        ObjectNode credentialRequestOptionsNode = om.createObjectNode();
-        List<FIDO2RegistrationEntity> registrations = registrationsRepository.findAllByUsernameAndDomain(username, documentDomain);
-
-        byte buffer[] = new byte[32];
-        new SecureRandom().nextBytes(buffer);
-
-        String challenge = base64UrlEncoder.encodeToString(buffer);
-        credentialRequestOptionsNode.put("challenge", challenge);
-
-        ObjectNode credentialUserEntityNode = credentialRequestOptionsNode.putObject("user");
-        credentialUserEntityNode.put("name", username);
-
-        ObjectNode publicKeyCredentialRpEntityNode = credentialRequestOptionsNode.putObject("rp");
-        publicKeyCredentialRpEntityNode.put("name", "ACME Dawid");
-        publicKeyCredentialRpEntityNode.put("id", documentDomain);
-        ArrayNode publicKeyCredentialDescriptors = credentialRequestOptionsNode.putArray("allowCredentials");
-
-        for (FIDO2RegistrationEntity registration : registrations) {
-            if (StringUtils.isEmpty(registration.getPublicKeyId())) {
-                throw new Fido2RPRuntimeException("Can't find associated key. Have you registered");
-            }
-            ObjectNode publicKeyCredentialDescriptorNode = publicKeyCredentialDescriptors.addObject();
-            publicKeyCredentialDescriptorNode.put("type", "public-key");
-            ArrayNode authenticatorTransportNode = publicKeyCredentialDescriptorNode.putArray("transports");
-            authenticatorTransportNode.add("usb").add("ble").add("nfc");
-            publicKeyCredentialDescriptorNode.put("id", registration.getPublicKeyId());
-        }
-
-        credentialRequestOptionsNode.put("status", "ok");
-
-
-        FIDO2AuthenticationEntity entity = new FIDO2AuthenticationEntity();
-        entity.setUsername(username);
-        entity.setChallenge(challenge);
-        entity.setDomain(documentDomain);
-        entity.setW3cCredentialRequestOptions(credentialRequestOptionsNode.toString());
-
-        authenticationsRepository.save(entity);
-        credentialRequestOptionsNode.put("status", "ok");
-        credentialRequestOptionsNode.put("errorMessage", "");
-        return credentialRequestOptionsNode;
-    }
 
 }
