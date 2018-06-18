@@ -30,7 +30,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
-class AuthenticatorDataParser {
+public class AuthenticatorDataParser {
 
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticatorDataParser.class);
@@ -50,7 +50,7 @@ class AuthenticatorDataParser {
         return parseAuthData(incomingAuthData, true);
     }
 
-    AuthData parseAssertionData(String incomingAuthData){
+    public AuthData parseAssertionData(String incomingAuthData) {
         return parseAuthData(incomingAuthData, false);
     }
 
@@ -125,7 +125,7 @@ class AuthenticatorDataParser {
         return authData;
     }
 
-    int parseCounter(byte[] counter){
+    public int parseCounter(byte[] counter) {
         int cnt = ByteBuffer.wrap(counter).asIntBuffer().get();
         return cnt;
     }

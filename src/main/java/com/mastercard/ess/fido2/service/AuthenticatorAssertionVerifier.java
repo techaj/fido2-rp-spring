@@ -13,12 +13,11 @@
 package com.mastercard.ess.fido2.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.database.FIDO2AuthenticationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import java.security.interfaces.ECPublicKey;
+import com.mastercard.ess.fido2.service.processors.AssertionFormatProcessor;
+import com.mastercard.ess.fido2.service.processors.AssertionProcessorFactory;
 import java.util.Base64;
-import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,58 +29,22 @@ public class AuthenticatorAssertionVerifier {
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticatorAssertionVerifier.class);
 
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
-
-    @Autowired
-    CommonVerifiers commonVerifiers;
-
-    @Autowired
-    AuthenticatorDataParser authenticatorDataParser;
-
-    @Autowired
-    @Qualifier("base64UrlDecoder")
-    private Base64.Decoder base64UrlDecoder;
-
-    @Autowired
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;
 
 
     @Autowired
-    @Qualifier("cborMapper")
-    ObjectMapper cborMapper;
+    AssertionProcessorFactory assertionProcessorFactory;
 
-    public void verifyAuthenticatorAssertionResponse(JsonNode response, FIDO2RegistrationEntity registration) {
-        JsonNode authenticatorResponse = response.get("response");
+
+    public void verifyAuthenticatorAssertionResponse(JsonNode response, FIDO2RegistrationEntity registration, FIDO2AuthenticationEntity authenticationEntity) {
+        JsonNode authenticatorResponse = response;
         String base64AuthenticatorData = authenticatorResponse.get("authenticatorData").asText();
         String clientDataJson = authenticatorResponse.get("clientDataJSON").asText();
         String signature = authenticatorResponse.get("signature").asText();
-        String userHandle = authenticatorResponse.get("userHandle").asText();
-
 
         LOGGER.info("Authenticator data {}", base64AuthenticatorData);
-        if ("fido-u2f".equals(registration.getAttestationType())) {
-            AuthData authData = authenticatorDataParser.parseAssertionData(base64AuthenticatorData);
-            commonVerifiers.verifyUserPresent(authData);
-            byte[] clientDataHash = DigestUtils.getSha256Digest().digest(base64UrlDecoder.decode(clientDataJson));
-
-            try {
-                JsonNode uncompressedECPointNode = cborMapper.readTree(base64UrlDecoder.decode(registration.getUncompressedECPoint()));
-                byte[] publicKey = uncompressedECPointHelper.createUncompressedPointFromCOSEPublicKey(uncompressedECPointNode);
-                int coseCurveCode = uncompressedECPointHelper.getCodeCurve(uncompressedECPointNode);
-                LOGGER.info("Uncompressed ECpoint node {}", uncompressedECPointNode.toString());
-                LOGGER.info("EC Public key hex {}", Hex.encodeHexString(publicKey));
-                ECPublicKey ecPublicKey = uncompressedECPointHelper.convertUncompressedPointToECKey(publicKey,coseCurveCode);
-                commonVerifiers.verifyAssertionSignature(authData, clientDataHash, signature, ecPublicKey, registration.getSignatureAlgorithm());
-                int counter = authenticatorDataParser.parseCounter(authData.getCounters());
-                commonVerifiers.verifyCounter(registration.getCounter(), counter);
-                registration.setCounter(counter);
-            } catch (Exception e) {
-                throw new Fido2RPRuntimeException("General server error " + e.getMessage());
-            }
-        }
-
+        AssertionFormatProcessor assertionProcessor = assertionProcessorFactory.getCommandProcessor(registration.getAttestationType());
+        assertionProcessor.process(base64AuthenticatorData, signature, clientDataJson, registration, authenticationEntity);
     }
-
-
 }

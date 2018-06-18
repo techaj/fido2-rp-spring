@@ -79,7 +79,7 @@ class AttestationService {
         LOGGER.info("registerResponse {}", params);
         //JsonNode request = params.get("request");
 
-        commonVerifiers.verifyAttestationPayload(params);
+        commonVerifiers.verifyBasicPayload(params);
         commonVerifiers.verifyBase64UrlString(params.get("type"));
         JsonNode response = params.get("response");
         JsonNode clientDataJSONNode = null;
@@ -90,6 +90,7 @@ class AttestationService {
         }
 
         commonVerifiers.verifyClientJSON(clientDataJSONNode);
+        commonVerifiers.verifyClientJSONTypeIsCreate(clientDataJSONNode);
         JsonNode keyIdNode = params.get("id");
         String keyId = commonVerifiers.verifyBase64UrlString(keyIdNode);
 
@@ -106,6 +107,7 @@ class AttestationService {
 
         domainVerifier.verifyDomain(credentialFound.getDomain(), clientDataJSONNode.get("origin").asText());
         CredAndCounterData attestationData = authenticatorAttestationVerifier.verifyAuthenticatorAttestationResponse(response, credentialFound);
+        credentialFound.setAttestationType(attestationData.getAttestationType());
         credentialFound.setUncompressedECPoint(attestationData.getUncompressedEcPoint());
         credentialFound.setAttestationType(attestationData.getAttestationType());
         credentialFound.setStatus(RegistrationStatus.REGISTERED);

@@ -75,13 +75,11 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
     @Override
     public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity credential, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
         int alg = -7;
-        credIdAndCounters.setAttestationType("fido-u2f");
-        credIdAndCounters.setCredId(base64UrlEncoder.encodeToString(authData.getCredId()));
+
         String signature = commonVerifiers.verifyBase64String(attStmt.get("sig"));
         commonVerifiers.verifyAAGUIDZeroed(authData);
         commonVerifiers.verifyUserPresent(authData);
         commonVerifiers.verifyRpIdHash(authData, credential.getDomain());
-        credIdAndCounters.setUncompressedEcPoint(base64UrlEncoder.encodeToString(authData.getCOSEPublicKey()));
 
         if (attStmt.hasNonNull("x5c")) {
             Iterator<JsonNode> i = attStmt.get("x5c").elements();
@@ -104,6 +102,7 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
             List<X509Certificate> trustAnchorCertificates = certificateSelector.selectRootCertificate(certificates.get(0));
             Certificate verifiedCert = certificateValidator.verifyCert(certificates, trustAnchorCertificates);
             commonVerifiers.verifyU2FAttestationSignature(authData, clientDataHash, signature, verifiedCert, alg);
+
         } else if (attStmt.hasNonNull("ecdaaKeyId")) {
             String ecdaaKeyId = attStmt.get("ecdaaKeyId").asText();
             throw new UnsupportedOperationException("TODO");
@@ -111,6 +110,9 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
             ECPublicKey ecPublicKey = uncompressedECPointHelper.getPublicKeyFromUncompressedECPoint(authData.getCOSEPublicKey());
             commonVerifiers.verifyPackedSurrogateAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, ecPublicKey, alg);
         }
+        credIdAndCounters.setAttestationType(getAttestationFormat().getFmt());
+        credIdAndCounters.setCredId(base64UrlEncoder.encodeToString(authData.getCredId()));
+        credIdAndCounters.setUncompressedEcPoint(base64UrlEncoder.encodeToString(authData.getCOSEPublicKey()));
     }
 
     X509Certificate getCertificate(String x5c) {

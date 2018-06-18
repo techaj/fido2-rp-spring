@@ -28,7 +28,7 @@ public class RPResponseEntityExceptionHandler extends ResponseEntityExceptionHan
 
     @ExceptionHandler(value = { Fido2RPRuntimeException.class})
     protected ResponseEntity<Object> handleConflict(Fido2RPRuntimeException ex, WebRequest request) {
-        LOGGER.error("We have a problem", ex.getFormattedMessage().getErrorMessage());
+        LOGGER.error("We have a problem " + ex.getFormattedMessage().getErrorMessage(), ex);
         return handleExceptionInternal(ex, ex.getFormattedMessage(),new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 }

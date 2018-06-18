@@ -62,17 +62,17 @@ public class UncompressedECPointHelper {
         }
     }
 
-    int getCodeCurve(JsonNode uncompressedECPointNode) {
+    public int getCodeCurve(JsonNode uncompressedECPointNode) {
         return uncompressedECPointNode.get("-1").asInt();
     }
 
-    byte[] createUncompressedPointFromCOSEPublicKey(JsonNode uncompressedECPointNode) {
+    public byte[] createUncompressedPointFromCOSEPublicKey(JsonNode uncompressedECPointNode) {
         byte[] x = base64Decoder.decode(uncompressedECPointNode.get("-2").asText());
         byte[] y = base64Decoder.decode(uncompressedECPointNode.get("-3").asText());
         return ByteBuffer.allocate(1 + x.length + y.length).put(UNCOMPRESSED_POINT_INDICATOR).put(x).put(y).array();
     }
 
-    ECPublicKey convertUncompressedPointToECKey(final byte[] uncompressedPoint, int curve) {
+    public ECPublicKey convertUncompressedPointToECKey(final byte[] uncompressedPoint, int curve) {
         AlgorithmParameters parameters = null;
         try {
             parameters = AlgorithmParameters.getInstance("EC", provider);

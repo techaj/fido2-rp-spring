@@ -76,6 +76,8 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity credential, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
         int alg = commonVerifiers.verifyAlgorithm(attStmt.get("alg"), authData.getKeyType());
         String signature = commonVerifiers.verifyBase64String(attStmt.get("sig"));
+
+
         if (attStmt.hasNonNull("x5c")) {
             Iterator<JsonNode> i = attStmt.get("x5c").elements();
             ArrayList<String> certificatePath = new ArrayList();
@@ -104,6 +106,10 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
             ECPublicKey ecPublicKey = uncompressedECPointHelper.getPublicKeyFromUncompressedECPoint(authData.getCOSEPublicKey());
             commonVerifiers.verifyPackedSurrogateAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, ecPublicKey, alg);
         }
+        credIdAndCounters.setAttestationType(getAttestationFormat().getFmt());
+        credIdAndCounters.setCredId(base64UrlEncoder.encodeToString(authData.getCredId()));
+        credIdAndCounters.setUncompressedEcPoint(base64UrlEncoder.encodeToString(authData.getCOSEPublicKey()));
+
     }
 
     X509Certificate getCertificate(String x5c) {

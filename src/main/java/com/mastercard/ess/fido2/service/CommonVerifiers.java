@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.ctap.UserVerification;
 import com.mastercard.ess.fido2.service.processors.AttestationFormatProcessor;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -121,7 +122,7 @@ public class CommonVerifiers {
         verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
     }
 
-    void verifyAssertionSignature(AuthData authData, byte[] clientDataHash, String signature, ECPublicKey publicKey, int signatureAlgorithm) {
+    public void verifyAssertionSignature(AuthData authData, byte[] clientDataHash, String signature, ECPublicKey publicKey, int signatureAlgorithm) {
         int bufferSize = 0;
         byte[] rpIdHash = authData.getRpIdHash();
         bufferSize += rpIdHash.length;
@@ -162,7 +163,10 @@ public class CommonVerifiers {
     }
 
 
-    void verifyCounter(int oldCounter, int newCounter) {
+    public void verifyCounter(int oldCounter, int newCounter) {
+        LOGGER.info("old counter {} new counter {} ", oldCounter, newCounter);
+        if (newCounter == 0 && oldCounter == 0)
+            return;
         if(newCounter <= oldCounter) {
             throw new Fido2RPRuntimeException("Counter did not increase");
         }
@@ -267,8 +271,8 @@ public class CommonVerifiers {
 
     public void verifyOptions(JsonNode params) {
         long count = Arrays.asList(
-                params.hasNonNull("username"),
-                params.hasNonNull("displayName")
+                params.hasNonNull("username")
+//                params.hasNonNull("displayName")
 //                params.hasNonNull("attestation")
                 //params.hasNonNull("documentDomain")
         ).parallelStream().filter(f -> f == false).count();
@@ -277,7 +281,7 @@ public class CommonVerifiers {
         }
     }
 
-    public void verifyAttestationPayload(JsonNode params) {
+    public void verifyBasicPayload(JsonNode params) {
         long count = Arrays.asList(
                 params.hasNonNull("response"),
                 params.hasNonNull("type")
@@ -288,32 +292,7 @@ public class CommonVerifiers {
         }
     }
 
-    public void verifyClientJSON(JsonNode params) {
-        long count = Arrays.asList(
-                params.hasNonNull("challenge"),
-                params.hasNonNull("origin"),
-                params.hasNonNull("type")
-                //params.hasNonNull("documentDomain")
-        ).parallelStream().filter(f -> f == false).count();
-        if (count != 0) {
-            throw new Fido2RPRuntimeException("Invalid client json parameters");
-        }
-        verifyBase64UrlString(params.get("challenge"));
 
-
-        if (params.hasNonNull("tokenBinding")) {
-            verifyThatString(params.get("tokenBinding"));
-        }
-
-        String origin = verifyThatString(params.get("origin"));
-        if (origin.isEmpty()) {
-            throw new Fido2RPRuntimeException("Invalid client json parameters");
-        }
-
-        if (!"webauthn.create".equals(params.get("type").asText())) {
-            throw new Fido2RPRuntimeException("Invalid client json parameters");
-        }
-    }
 
     public String verifyBase64UrlString(JsonNode node) {
         String value = verifyThatString(node);
@@ -455,7 +434,53 @@ public class CommonVerifiers {
         }
     }
 
-    ;
+    public void verifyClientJSONTypeIsGet(JsonNode clientJsonNode) {
+        verifyClientJSONType(clientJsonNode, "webauthn.get");
+    }
+
+    void verifyClientJSONType(JsonNode clientJsonNode, String type) {
+        if (!type.equals(clientJsonNode.get("type").asText())) {
+            throw new Fido2RPRuntimeException("Invalid client json parameters");
+        }
+    }
+
+    public void verifyClientJSONTypeIsCreate(JsonNode clientJsonNode) {
+        verifyClientJSONType(clientJsonNode, "webauthn.create");
+    }
+
+    public void verifyClientJSON(JsonNode clientJsonNode) {
+        long count = Arrays.asList(
+                clientJsonNode.hasNonNull("challenge"),
+                clientJsonNode.hasNonNull("origin"),
+                clientJsonNode.hasNonNull("type")
+                //params.hasNonNull("documentDomain")
+        ).parallelStream().filter(f -> f == false).count();
+        if (count != 0) {
+            throw new Fido2RPRuntimeException("Invalid client json parameters");
+        }
+        verifyBase64UrlString(clientJsonNode.get("challenge"));
+
+
+        if (clientJsonNode.hasNonNull("tokenBinding")) {
+            verifyThatString(clientJsonNode.get("tokenBinding"));
+        }
+
+        String origin = verifyThatString(clientJsonNode.get("origin"));
+        if (origin.isEmpty()) {
+            throw new Fido2RPRuntimeException("Invalid client json parameters");
+        }
+
+
+    }
+
+
+    public String verifyUserVerification(JsonNode userVerification) {
+        try {
+            return UserVerification.valueOf(userVerification.asText()).name();
+        } catch (Exception e) {
+            throw new Fido2RPRuntimeException("Wrong user verification parameter " + e.getMessage());
+        }
+    }
 }
 
 
