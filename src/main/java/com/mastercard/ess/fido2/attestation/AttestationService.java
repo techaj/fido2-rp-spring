@@ -144,7 +144,9 @@ class AttestationService {
         try {
             host = new URL(documentDomain).getHost();
         } catch (MalformedURLException e) {
-            throw new Fido2RPRuntimeException(e.getMessage());
+            host = documentDomain;
+//            throw new Fido2RPRuntimeException(e.getMessage());
+
         }
 
 

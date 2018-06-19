@@ -523,7 +523,7 @@ function processRegisterForm(e) {
 
 //    let rpid = window.location.origin
     let rpid = document.domain;
-    let formBody = {"username": $("#username").val(),"displayName":"dawid","documentDomain":rpid,"attestation":""};
+    let formBody = {"username": $("#username").val(),"displayName":"dawid"};
     fetch('/attestation/options', {
         method: 'POST',
         credentials: 'include',
@@ -532,105 +532,33 @@ function processRegisterForm(e) {
         },
         body: JSON.stringify(formBody)
     })
-        .then((response) => response.json())
-        .then((response) => {
-        if(response.status !== 'ok')
-    throw new Error(`Server responed with error. The message is: ${response.message}`);
-    console.info("Updated Response from FIDO RP server ", response)
-    var resp = preformatMakeCredReq(response)
-    resp.extensions={"exts":true}
+    .then((response) => response.json())
+    .then((response) => {
+            if(response.status !== 'ok')
+                throw new Error(`Server responed with error. The message is: ${response.message}`);
+            console.info("Updated Response from FIDO RP server ", response)
+            navigator.credentials.create({ publicKey: response})
+                .then(function (response){
+                       console.info("respones = " + JSON.stringify(response))
+                        var response = {"request":state.createRequest,"response":publicKeyCredentialToJSON(state.createResponse)};
+                        fetch('/attestation/result', {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(publicKeyCredentialToJSON(state.createResponse))
+                        }
+                        )
+                        append("createOut", gResults.toString() + "\n\n");
+                        switchToLogin();
+                }).catch(function(error){
+                               console.error("respones = " + error)
+                           }
+                       )
 
-    state.createRequest = resp;
-
-    console.info("Updated Response from FIDO RP server ", resp)
-    navigator.credentials.create({ publicKey: resp})
-        .then(function (aNewCredentialInfo) {
-            state.createResponse = aNewCredentialInfo
-            append("createOut", "Note: Raw response in console.\n");
-            console.log("Credentials.Create response: ", aNewCredentialInfo);
-            console.log("Credentials.Create response: ", JSON.stringify(aNewCredentialInfo));
-
-            let buffer = getArrayBuffer("createOut", aNewCredentialInfo.response.attestationObject);
-            return webAuthnDecodeCBORAttestation(buffer);
-        })
-        .then(function (aAttestation) {
-            // Make sure the RP ID hash matches what we calculate.
-            return crypto.subtle.digest("SHA-256", string2buffer(rpid))
-                .then(function(calculatedHash) {
-                    testEqual("createOut", b64enc(new Uint8Array(calculatedHash)), b64enc(aAttestation.rpIdHash),
-                        "Calculated RP ID hash must match what the browser derived.");
-                    return Promise.resolve(aAttestation);
-                });
-        })
-        .then(async function (aAttestation) {
-        console.log("Attestation", JSON.stringify(aAttestation))
-        let flags = new Uint8Array(aAttestation.flags);
-        testEqual("createOut", flags, (flag_TUP | flag_AT), "User presence and Attestation Object must both be set");
-        testEqual("createOut", hexEncode(aAttestation.attestationAuthData.credId), hexEncode(state.createResponse.rawId), "Credential ID from CBOR and Raw ID match");
-        state.keyHandle = state.createResponse.rawId;
-        append("createOut", "Keypair Identifier: " + hexEncode(state.keyHandle) + "\n");
-        append("createOut", "Public Key: " + hexEncode(aAttestation.publicKeyBytes) + "\n");
-
-        state.publicKey = aAttestation.publicKeyHandle;
-
-        append("createOut", "\n:: CBOR Attestation Object Data ::\n");
-        append("createOut", "RP ID Hash: " + hexEncode(aAttestation.rpIdHash) + "\n");
-        append("createOut", "Counter: " + hexEncode(aAttestation.counter) + " Flags: " + flags + " CredID Len" +aAttestation.attestationAuthData.credIdLen+"\n");
-        append("createOut", "Cred ID: " + hexEncode(aAttestation.attestationAuthData.credId) +"\n");
-        append("createOut", "AAGUID: " + hexEncode(aAttestation.attestationAuthData.aaguid) + "\n");
-
-
-        /* Decode Client Data */
-        append("createOut", "\n:: Client Data Information ::\n");
-        let clientData = JSON.parse(buffer2string(state.createResponse.response.clientDataJSON));
-        append("createOut", "Client Data object, in full:\n");
-        append("createOut", JSON.stringify(clientData, null, 2) + "\n\n");
-        challengeBytes = base64url.encode(state.createRequest.challenge)
-        //testEqual("createOut", b64enc(challengeBytes), clientData.challenge, "Challenge matches");
-        testEqual("createOut", challengeBytes, clientData.challenge, "Challenge matches");
-        testEqual("createOut", window.location.origin, clientData.origin, "ClientData.origin matches this origin (WD-06)");
-        if ("type" in clientData) {
-            testEqual("createOut", "webauthn.create", clientData.type, "Type is valid (WD-08)");
-        } else {
-            gResults.todo("clientData.type is not set (WD-08)");
         }
-
-    }).then(function (){
-        append("createOut", "\n\nRaw request:\n");
-        append("createOut", JSON.stringify(state.createRequest, null, 2) + "\n\n");
-    }).catch(function (aErr) {
-        console.log("ERR HAPPENED");
-        if ("name" in aErr && (aErr.name == "AbortError" || aErr.name == "NS_ERROR_ABORT")) {
-            gResults.reset();
-            append("createOut", "Aborted; retry?\n");
-            displayError("Aborted; retry?");
-        } else {
-            gResults.fail();
-            append("createOut", "Got error:\n");
-            append("createOut", aErr.toString() + "\n\n");
-            displayError("Got error: "+aErr.toString());
-        }
-
-    }).then(function (){
-        resultColor("createOut");
-
-        state.createRequest.challenge = base64url.encode(state.createRequest.challenge);
-        state.createRequest.user.id = base64url.encode(state.createRequest.user.id);
-
-        var response = {"request":state.createRequest,"response":publicKeyCredentialToJSON(state.createResponse)};
-        fetch('/attestation/result', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(response)
-        });
-
-        append("createOut", gResults.toString() + "\n\n");
-        switchToLogin();
-    });
-})
+        )
 
     return false;
 }
