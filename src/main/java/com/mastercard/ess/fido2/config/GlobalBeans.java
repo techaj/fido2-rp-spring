@@ -16,7 +16,13 @@ package com.mastercard.ess.fido2.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
+import com.mastercard.ess.fido2.service.AttestationFormat;
+import java.security.Provider;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -46,12 +52,21 @@ public class GlobalBeans {
     }
 
 
-
-
-
     @Primary
     @Bean
     public ObjectMapper getJsonMapper() {
         return new ObjectMapper();
     }
+
+    @Bean
+    Provider getBouncyCastleProvider() {
+        BouncyCastleProvider p = new BouncyCastleProvider();
+        return p;
+    }
+
+    @Bean(name = "supportedAttestationFormats")
+    public List<String> getSupportedAttestationFormats() {
+        return Arrays.stream(AttestationFormat.values()).map(f -> f.getFmt()).collect(Collectors.toList());
+    }
+
 }

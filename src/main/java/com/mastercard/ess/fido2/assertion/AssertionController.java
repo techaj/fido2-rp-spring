@@ -25,6 +25,11 @@ class AssertionController {
     @Autowired
     private AssertionService assertionService;
 
+    @PostMapping(value = {"/options"}, produces = {"application/json"}, consumes = {"application/json"})
+    JsonNode register(@RequestBody JsonNode params) {
+        return assertionService.options(params);
+    }
+
 
     @PostMapping(value = {"/result"}, produces = {"application/json"}, consumes = {"application/json"})
     JsonNode verify(@RequestBody JsonNode params) {

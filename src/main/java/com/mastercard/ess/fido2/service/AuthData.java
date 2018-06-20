@@ -12,13 +12,16 @@
 
 package com.mastercard.ess.fido2.service;
 
-class AuthData {
+public class AuthData {
     private byte[] rpIdHash;
     private byte[] flags;
     private byte[] counters;
     private byte[] aaguid;
     private byte[] credId;
     private byte[] signatureBaseFields;
+    private byte[] attestationBuffer;
+    private int keyType;
+    private byte[] authDataDecoded;
 
     public byte[] getRpIdHash() {
         return rpIdHash;
@@ -76,5 +79,27 @@ class AuthData {
 
     private byte[] COSEPublicKey;
 
+    public byte[] getAttestationBuffer() {
+        return attestationBuffer;
+    }
 
+    public void setAttestationBuffer(byte[] attestationBuffer) {
+        this.attestationBuffer = attestationBuffer;
+    }
+
+    public int getKeyType() {
+        return keyType;
+    }
+
+    public void setKeyType(int keyType) {
+        this.keyType = keyType;
+    }
+
+    public byte[] getAuthDataDecoded() {
+        return authDataDecoded;
+    }
+
+    public void setAuthDataDecoded(byte[] authDataDecoded) {
+        this.authDataDecoded = authDataDecoded;
+    }
 }

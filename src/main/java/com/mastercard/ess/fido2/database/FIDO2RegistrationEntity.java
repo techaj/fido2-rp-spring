@@ -58,6 +58,10 @@ public class FIDO2RegistrationEntity extends FIDO2Entity {
     @Column(name = "RegistrationKeyId", length = 512)
     private String publicKeyId;
 
+
+    @Column(name = "RegistrationKeyType", length = 512)
+    private String type;
+
     @Column(name = "Status", length = 32)
     private RegistrationStatus status;
 
@@ -66,6 +70,9 @@ public class FIDO2RegistrationEntity extends FIDO2Entity {
 
     @Column(name = "AttestationType",length = 128)
     private String attestationType;
+
+    @Column(name = "SigAlgorithmType")
+    private int signatureAlgorithm;
 
     public String getUserId() {
         return userId;
@@ -177,5 +184,23 @@ public class FIDO2RegistrationEntity extends FIDO2Entity {
     public FIDO2RegistrationEntity setUncompressedECPoint(String uncompressedECPoint) {
         this.uncompressedECPoint = uncompressedECPoint;
         return this;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public FIDO2RegistrationEntity setType(String type) {
+        this.type = type;
+        return this;
+    }
+
+
+    public int getSignatureAlgorithm() {
+        return signatureAlgorithm;
+    }
+
+    public void setSignatureAlgorithm(int signatureAlgorithm) {
+        this.signatureAlgorithm = signatureAlgorithm;
     }
 }

@@ -14,18 +14,25 @@ package com.mastercard.ess.fido2.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.ctap.UserVerification;
+import com.mastercard.ess.fido2.service.processors.AttestationFormatProcessor;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.cert.X509Certificate;
+import java.security.cert.Certificate;
 import java.security.interfaces.ECPublicKey;
+import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.PSSParameterSpec;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
@@ -35,9 +42,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
-class CommonVerifiers {
+public class CommonVerifiers {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommonVerifiers.class);
     private static final byte U2F_USER_PRESENTED = 0x01;
+    private static final byte ATTESTATION_DATA_FLAG = 0x40;
 
     @Autowired
     @Qualifier("base64UrlDecoder")
@@ -54,9 +62,14 @@ class CommonVerifiers {
     @Autowired
     @Qualifier("cborMapper")
     ObjectMapper cborMapper;
+    @Autowired
+    Provider provider;
+
+    @Autowired
+    List<AttestationFormatProcessor> supportedAttestationFormats;
 
 
-    void verifyAttestationSignature(AuthData authData, byte[] clientDataHash, String signature, X509Certificate certificate) {
+    public void verifyU2FAttestationSignature(AuthData authData, byte[] clientDataHash, String signature, Certificate certificate, int signatureAlgorithm) {
         int bufferSize = 0;
         byte[] reserved = new byte[]{0x00};
         bufferSize += reserved.length;
@@ -73,10 +86,43 @@ class CommonVerifiers {
         byte[] signatureBytes = base64Decoder.decode(signature.getBytes());
         LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
         LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
-        verifySignature(signatureBytes, signatureBase, certificate);
+        verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
     }
 
-    void verifyAssertionSignature(AuthData authData, byte[] clientDataHash, String signature, ECPublicKey publicKey) {
+    void verifyPackedAttestationSignature(AuthData authData, byte[] clientDataHash, String signature, Certificate certificate, int signatureAlgorithm) {
+        int bufferSize = 0;
+        byte[] rpIdHashBuffer = authData.getRpIdHash();
+        bufferSize += rpIdHashBuffer.length;
+
+        byte[] flagsBuffer = authData.getFlags();
+        bufferSize += flagsBuffer.length;
+
+        byte[] countersBuffer = authData.getCounters();
+        bufferSize += countersBuffer.length;
+
+        bufferSize += clientDataHash.length;
+        byte[] signatureBase = ByteBuffer.allocate(bufferSize).put(rpIdHashBuffer).put(flagsBuffer).put(countersBuffer).put(clientDataHash).array();
+        byte[] signatureBytes = base64Decoder.decode(signature.getBytes());
+        LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
+        LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
+        LOGGER.info("Signature BaseLen {}", signatureBase.length);
+        verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
+    }
+
+    public void verifyPackedAttestationSignature(byte[] authData, byte[] clientDataHash, String signature, Certificate certificate, int signatureAlgorithm) {
+        int bufferSize = 0;
+
+        bufferSize += authData.length;
+        bufferSize += clientDataHash.length;
+        byte[] signatureBase = ByteBuffer.allocate(bufferSize).put(authData).put(clientDataHash).array();
+        byte[] signatureBytes = base64Decoder.decode(signature.getBytes());
+        LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
+        LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
+        LOGGER.info("Signature BaseLen {}", signatureBase.length);
+        verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
+    }
+
+    public void verifyAssertionSignature(AuthData authData, byte[] clientDataHash, String signature, ECPublicKey publicKey, int signatureAlgorithm) {
         int bufferSize = 0;
         byte[] rpIdHash = authData.getRpIdHash();
         bufferSize += rpIdHash.length;
@@ -90,10 +136,10 @@ class CommonVerifiers {
         byte[] signatureBytes = base64UrlDecoder.decode(signature.getBytes());
         LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
         LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
-        verifySignature(signatureBytes, signatureBase, publicKey);
+        verifySignature(signatureBytes, signatureBase, publicKey, signatureAlgorithm);
     }
 
-    boolean verifyUserPresent(AuthData authData) {
+    public boolean verifyUserPresent(AuthData authData) {
         if ((authData.getFlags()[0] & U2F_USER_PRESENTED) == 1) {
             return true;
         } else {
@@ -101,7 +147,7 @@ class CommonVerifiers {
         }
     }
 
-    void verifyRpIdHash(AuthData authData, String domain) {
+    public void verifyRpIdHash(AuthData authData, String domain) {
         try {
             byte[] retrievedRpIdHash = authData.getRpIdHash();
             byte[] calculatedRpIdHash = DigestUtils.getSha256Digest().digest(domain.getBytes("UTF-8"));
@@ -117,7 +163,10 @@ class CommonVerifiers {
     }
 
 
-    void verifyCounter(int oldCounter, int newCounter) {
+    public void verifyCounter(int oldCounter, int newCounter) {
+        LOGGER.info("old counter {} new counter {} ", oldCounter, newCounter);
+        if (newCounter == 0 && oldCounter == 0)
+            return;
         if(newCounter <= oldCounter) {
             throw new Fido2RPRuntimeException("Counter did not increase");
         }
@@ -136,21 +185,302 @@ class CommonVerifiers {
         }
     }
 
-    private void verifySignature(byte[] signature, byte[] signatureBase, X509Certificate certificate) {
-        verifySignature(signature, signatureBase,certificate.getPublicKey());
+    private void verifySignature(byte[] signature, byte[] signatureBase, Certificate certificate, int signatureAlgorithm) {
+        verifySignature(signature, signatureBase, certificate.getPublicKey(), signatureAlgorithm);
     }
 
-    private void verifySignature(byte[] signature, byte[] signatureBase, PublicKey publicKey) {
+    private void verifySignature(byte[] signature, byte[] signatureBase, PublicKey publicKey, int signatureAlgorithm) {
         try {
-            Signature signatureChecker = Signature.getInstance("SHA256withECDSA");
+            Signature signatureChecker = getSignatureChecker(signatureAlgorithm);
             signatureChecker.initVerify(publicKey);
             signatureChecker.update(signatureBase);
             if (!signatureChecker.verify(signature)) {
                 throw new Fido2RPRuntimeException("Unable to verify signature");
             }
-
-        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+        } catch (InvalidKeyException | SignatureException e) {
             throw new Fido2RPRuntimeException("Can't verify the signature");
         }
     }
+
+    private Signature getSignatureChecker(int signatureAlgorithm) {
+
+        //https://www.iana.org/assignments/cose/cose.xhtml#algorithms
+        try {
+
+            switch (signatureAlgorithm) {
+                case -7: {
+                    Signature signatureChecker = Signature.getInstance("SHA256withECDSA", provider);
+                    return signatureChecker;
+                }
+
+                case -35: {
+                    Signature signatureChecker = Signature.getInstance("SHA384withECDSA", provider);
+                    return signatureChecker;
+                }
+
+                case -36: {
+                    Signature signatureChecker = Signature.getInstance("SHA512withECDSA", provider);
+                    return signatureChecker;
+                }
+
+
+                case -37: {
+                    Signature signatureChecker = Signature.getInstance("SHA256withRSA/PSS", provider);
+                    signatureChecker.setParameter(new PSSParameterSpec("SHA-256", "MGF1", new MGF1ParameterSpec("SHA-256"), 32, 1));
+                    return signatureChecker;
+                }
+                case -38: {
+                    Signature signatureChecker = Signature.getInstance("SHA384withRSA/PSS", provider);
+                    signatureChecker.setParameter(new PSSParameterSpec("SHA-384", "MGF1", new MGF1ParameterSpec("SHA-384"), 32, 1));
+                    return signatureChecker;
+                }
+
+                case -39: {
+                    Signature signatureChecker = Signature.getInstance("SHA512withRSA/PSS", provider);
+                    signatureChecker.setParameter(new PSSParameterSpec("SHA-512", "MGF1", new MGF1ParameterSpec("SHA-512"), 32, 1));
+                    return signatureChecker;
+                }
+                case -257: {
+                    Signature signatureChecker = Signature.getInstance("SHA256withRSA", provider);
+                    return signatureChecker;
+                }
+                case -258: {
+                    Signature signatureChecker = Signature.getInstance("SHA384withRSA", provider);
+                    return signatureChecker;
+                }
+                case -259: {
+                    Signature signatureChecker = Signature.getInstance("SHA512withRSA", provider);
+                    return signatureChecker;
+                }
+                case -65535: {
+                    Signature signatureChecker = Signature.getInstance("SHA1withRSA", provider);
+                    return signatureChecker;
+                }
+
+
+                default: {
+                    throw new Fido2RPRuntimeException("Unknown mapping");
+                }
+
+            }
+
+        } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
+            throw new Fido2RPRuntimeException("Problem with crypto");
+        }
+    }
+
+    public void verifyOptions(JsonNode params) {
+        long count = Arrays.asList(
+                params.hasNonNull("username")
+//                params.hasNonNull("displayName")
+//                params.hasNonNull("attestation")
+                //params.hasNonNull("documentDomain")
+        ).parallelStream().filter(f -> f == false).count();
+        if (count != 0) {
+            throw new Fido2RPRuntimeException("Invalid parameters");
+        }
+    }
+
+    public void verifyBasicPayload(JsonNode params) {
+        long count = Arrays.asList(
+                params.hasNonNull("response"),
+                params.hasNonNull("type")
+                //params.hasNonNull("documentDomain")
+        ).parallelStream().filter(f -> f == false).count();
+        if (count != 0) {
+            throw new Fido2RPRuntimeException("Invalid parameters");
+        }
+    }
+
+
+
+    public String verifyBase64UrlString(JsonNode node) {
+        String value = verifyThatString(node);
+        try {
+            base64UrlDecoder.decode(value.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new Fido2RPRuntimeException("Invalid id");
+        } catch (IllegalArgumentException e) {
+            throw new Fido2RPRuntimeException("Invalid id");
+        }
+
+        return value;
+    }
+
+
+    public String verifyThatString(JsonNode node) {
+        if (!node.isTextual()) {
+            throw new Fido2RPRuntimeException("Invalid field " + node.fieldNames().next());
+        }
+        return node.asText();
+    }
+
+    public String verifyAuthData(JsonNode node) {
+        if (node.isNull()) {
+            throw new Fido2RPRuntimeException("Empty auth data");
+        }
+
+        String data = verifyThatBinary(node);
+        if (data.isEmpty()) {
+            throw new Fido2RPRuntimeException("Invalid field " + node.fieldNames().next());
+        }
+        return data;
+    }
+
+    public String verifyThatBinary(JsonNode node) {
+        if (!node.isBinary()) {
+            throw new Fido2RPRuntimeException("Invalid field " + node.fieldNames().next());
+        }
+        return node.asText();
+    }
+
+    public void verifyCounter(int counter) {
+        if (counter < 0) {
+            throw new Fido2RPRuntimeException("Invalid field : counter");
+        }
+    }
+
+    public boolean verifyAtFlag(byte[] flags) {
+        return (flags[0] & ATTESTATION_DATA_FLAG) == ATTESTATION_DATA_FLAG;
+    }
+
+    public void verifyAttestationBuffer(boolean hasAtFlag, byte[] attestationBuffer) {
+        if (!hasAtFlag && attestationBuffer.length > 0) {
+            throw new Fido2RPRuntimeException("Invalid attestation data buffer");
+        }
+//        if(!hasAtFlag && attestationBuffer.length==0){
+//            throw new Fido2RPRuntimeException("Invalid attestation data buffer");
+//        }
+        if (hasAtFlag && attestationBuffer.length == 0) {
+            throw new Fido2RPRuntimeException("Invalid attestation data buffer");
+        }
+    }
+
+    public void verifyNoLeftovers(byte[] leftovers) {
+        if (leftovers.length > 0) {
+            throw new Fido2RPRuntimeException("Invalid attestation data buffer: leftovers");
+        }
+    }
+
+    public int verifyAlgorithm(JsonNode alg, int registeredAlgorithmType) {
+        if (alg.isNull()) {
+            throw new Fido2RPRuntimeException("Wrong algorithm");
+        }
+        int algorithmType = Integer.parseInt(alg.asText());
+        if (algorithmType != registeredAlgorithmType) {
+            throw new Fido2RPRuntimeException("Wrong algorithm");
+        }
+        return algorithmType;
+    }
+
+    public String verifyBase64String(JsonNode node) {
+        if (node.isNull()) {
+            throw new Fido2RPRuntimeException("Invalid data");
+        }
+        String value = verifyThatBinary(node);
+        if (value.isEmpty()) {
+            throw new Fido2RPRuntimeException("Invalid data");
+        }
+        try {
+            base64Decoder.decode(value.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new Fido2RPRuntimeException("Invalid data");
+        } catch (IllegalArgumentException e) {
+            throw new Fido2RPRuntimeException("Invalid data");
+        }
+
+        return value;
+
+    }
+
+    public void verifyPackedSurrogateAttestationSignature(byte[] authData, byte[] clientDataHash, String signature, ECPublicKey publicKey, int signatureAlgorithm) {
+        int bufferSize = 0;
+        bufferSize += authData.length;
+        bufferSize += clientDataHash.length;
+        byte[] signatureBase = ByteBuffer.allocate(bufferSize).put(authData).put(clientDataHash).array();
+        byte[] signatureBytes = base64Decoder.decode(signature.getBytes());
+        LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
+        LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
+        LOGGER.info("Signature BaseLen {}", signatureBase.length);
+        verifySignature(signatureBytes, signatureBase, publicKey, signatureAlgorithm);
+    }
+
+    public String verifyFmt(JsonNode fmtNode) {
+        String fmt = verifyThatString(fmtNode);
+        supportedAttestationFormats.stream().filter(f -> f.getAttestationFormat().getFmt().equals(fmt)).findAny().orElseThrow(() -> new Fido2RPRuntimeException("Unsupported attestation format " + fmt));
+        return fmt;
+    }
+
+    public void verifyAAGUIDZeroed(AuthData authData) {
+        byte[] buf = authData.getAaguid();
+        for (int i = 0; i < buf.length; i++) {
+            if (buf[i] != 0) {
+                throw new Fido2RPRuntimeException("Invalid AAGUID");
+            }
+        }
+    }
+
+    public void verifyTPMVersion(JsonNode ver) {
+        if (!"2.0".equals(ver.asText())) {
+            throw new Fido2RPRuntimeException("Invalid TPM Attestation version");
+        }
+    }
+
+    public String verifyAttestationType(JsonNode params) {
+        if (params.has("attestation")) {
+            return verifyThatString(params.get("attestation"));
+        } else {
+            return "direct";
+        }
+    }
+
+    public void verifyClientJSONTypeIsGet(JsonNode clientJsonNode) {
+        verifyClientJSONType(clientJsonNode, "webauthn.get");
+    }
+
+    void verifyClientJSONType(JsonNode clientJsonNode, String type) {
+        if (!type.equals(clientJsonNode.get("type").asText())) {
+            throw new Fido2RPRuntimeException("Invalid client json parameters");
+        }
+    }
+
+    public void verifyClientJSONTypeIsCreate(JsonNode clientJsonNode) {
+        verifyClientJSONType(clientJsonNode, "webauthn.create");
+    }
+
+    public void verifyClientJSON(JsonNode clientJsonNode) {
+        long count = Arrays.asList(
+                clientJsonNode.hasNonNull("challenge"),
+                clientJsonNode.hasNonNull("origin"),
+                clientJsonNode.hasNonNull("type")
+                //params.hasNonNull("documentDomain")
+        ).parallelStream().filter(f -> f == false).count();
+        if (count != 0) {
+            throw new Fido2RPRuntimeException("Invalid client json parameters");
+        }
+        verifyBase64UrlString(clientJsonNode.get("challenge"));
+
+
+        if (clientJsonNode.hasNonNull("tokenBinding")) {
+            verifyThatString(clientJsonNode.get("tokenBinding"));
+        }
+
+        String origin = verifyThatString(clientJsonNode.get("origin"));
+        if (origin.isEmpty()) {
+            throw new Fido2RPRuntimeException("Invalid client json parameters");
+        }
+
+
+    }
+
+
+    public String verifyUserVerification(JsonNode userVerification) {
+        try {
+            return UserVerification.valueOf(userVerification.asText()).name();
+        } catch (Exception e) {
+            throw new Fido2RPRuntimeException("Wrong user verification parameter " + e.getMessage());
+        }
+    }
 }
+
+

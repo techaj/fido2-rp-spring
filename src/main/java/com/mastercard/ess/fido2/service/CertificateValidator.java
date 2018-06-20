@@ -19,15 +19,16 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
+import java.security.cert.CertPathValidatorResult;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,23 +43,26 @@ public class CertificateValidator {
     }
 
 
-    void verifyCert(X509Certificate cert, java.security.cert.X509Certificate rootCertificate) {
+    public Certificate verifyCert(List<X509Certificate> certs, List<X509Certificate> trustChainCertificates) {
         try {
-            if (isSelfSigned(cert)) {
-                return;
+
+            if (isSelfSigned(certs.get(0))) {
+                return null;
             }
 
-            TrustAnchor trustAnchor = new TrustAnchor(rootCertificate, null);
-            Set<TrustAnchor> trustAnchors = new HashSet(Arrays.asList(new TrustAnchor[]{trustAnchor}));
+            Set<TrustAnchor> trustAnchors = trustChainCertificates.parallelStream().map(f -> new TrustAnchor(f, null)).collect(Collectors.toSet());
             PKIXParameters params = new PKIXParameters(trustAnchors);
             params.setRevocationEnabled(false);
             CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
             CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
-            CertPath certPath = certFactory.generateCertPath(Arrays.asList(new Certificate[]{cert}));
+            CertPath certPath = certFactory.generateCertPath(certs);
             try {
-                cpv.validate(certPath, params);
+                CertPathValidatorResult result = cpv.validate(certPath, params);
+                return certPath.getCertificates().get(0);
+
             } catch (CertPathValidatorException ex) {
-                LOGGER.warn("Cert not validated against the root {}", ex.getMessage(), ex);
+                LOGGER.warn("Cert not validated against the root {}", ex.getMessage());
+                throw new Fido2RPRuntimeException("Problem with certificate");
             }
 
         } catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | CertificateException e) {

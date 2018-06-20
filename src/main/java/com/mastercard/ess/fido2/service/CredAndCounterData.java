@@ -17,6 +17,7 @@ public class CredAndCounterData {
     private int counters;
     private String attestationType;
     private String uncompressedEcPoint;
+    private int signatureAlgorithm;
 
     public String getCredId() {
         return credId;
@@ -54,5 +55,13 @@ public class CredAndCounterData {
 
     public String getUncompressedEcPoint() {
         return uncompressedEcPoint;
+    }
+
+    public int getSignatureAlgorithm() {
+        return signatureAlgorithm;
+    }
+
+    public void setSignatureAlgorithm(int signatureAlgorithm) {
+        this.signatureAlgorithm = signatureAlgorithm;
     }
 }

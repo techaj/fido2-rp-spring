@@ -12,6 +12,8 @@
 
 package com.mastercard.ess.fido2.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +24,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 @ControllerAdvice
 public class RPResponseEntityExceptionHandler extends ResponseEntityExceptionHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RPResponseEntityExceptionHandler.class);
+
     @ExceptionHandler(value = { Fido2RPRuntimeException.class})
     protected ResponseEntity<Object> handleConflict(Fido2RPRuntimeException ex, WebRequest request) {
+        LOGGER.error("We have a problem " + ex.getFormattedMessage().getErrorMessage(), ex);
         return handleExceptionInternal(ex, ex.getFormattedMessage(),new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 }
