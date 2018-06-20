@@ -576,19 +576,13 @@ function processLoginForm(e) {
 
     $("#getOut").text("");
     gResults.reset();
-    if (!state.createResponse) {
-        gResults.fail();
-        append("getOut", "Need to make a credential first:\n");
-        displayError("Need to make a credential first:\n");
-        return;
-    }
 
     $("#getOut").text("Contacting token... please perform your verification gesture (e.g., touch it, or plug it in)\n\n");
 
     let rpid = document.domain;
     let formBody = {"username": $("#loginUsername").val(), "documentDomain":rpid};
 
-    fetch('/attestation/options', {
+    fetch('/assertion/options', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -596,114 +590,36 @@ function processLoginForm(e) {
         },
         body: JSON.stringify(formBody)
     })
-        .then((response) => response.json())
-.then((response) => {
-        if(response.status !== 'ok')
-    throw new Error(`Server responed with error. The message is: ${response.message}`);
-    console.info("Updated Response from FIDO RP server ", response)
-    var resp = preformatGetAssertReq(response)
-    state.createRequest = resp;
-    console.info("Updated Response from FIDO RP server ", resp)
-    navigator.credentials.get({publicKey: state.createRequest})
-        .then(function(aAssertion) {
-            console.log("Credentials.Get response: ", aAssertion);
-            append("getOut", "Raw response in console.\n");
-            state.assertion = aAssertion;
-            let clientData = JSON.parse(buffer2string(aAssertion.response.clientDataJSON));
-            challengeBytes = base64url.encode(state.createRequest.challenge)
-            testEqual("getOut", clientData.challenge, challengeBytes, "Challenge is identical");
-            testEqual("getOut", window.location.origin, clientData.origin, "ClientData.origin matches this origin (WD-06)");
-            if ("type" in clientData) {
-                testEqual("createOut", "webauthn.get", clientData.type, "Type is valid (WD-08)");
-            } else {
-                gResults.todo("clientData.type is not set (WD-08)");
-            }
-
-
-            return webAuthnDecodeAuthDataArray(aAssertion.response.authenticatorData)
-                .then(function (aAttestation) {
-                    // Make sure the RP ID hash matches what we calculate.
-                    return crypto.subtle.digest("SHA-256", string2buffer(rpid))
-                        .then(function(calculatedHash) {
-                            testEqual("getOut", b64enc(new Uint8Array(calculatedHash)), b64enc(new Uint8Array(aAttestation.rpIdHash)),
-                                "Calculated RP ID hash must match what the browser derived.");
-                            return Promise.resolve(aAttestation);
-                        });
-                })
-                .then(function(aAttestation) {
-                    if (!testEqual("getOut", new Uint8Array(aAttestation.flags), flag_TUP, "User presence must be the only flag set")) {
-                        throw "Assertion's user presence byte not set correctly.";
-                    }
-
-                    testEqual("getOut", aAttestation.counter.byteLength, 4, "Counter must be 4 bytes");
-
-                    let flags = new Uint8Array(aAttestation.flags);
-
-                    append("getOut", "\n:: CBOR Attestation Object Data ::\n");
-                    append("getOut", "RP ID Hash: " + hexEncode(aAttestation.rpIdHash) + "\n");
-                    append("getOut", "Counter: " + hexEncode(aAttestation.counter) + " Flags: " + flags + "\n");
-                    append("getOut", "\n");
-
-                    // Assemble the signed data and verify the signature
-                    appId = document.domain
-                    if ($("#rpIdText").val()) {
-                        appId = $("#rpIdText").val();
-                    }
-
-                    return deriveAppAndChallengeParam(appId, aAssertion.response.clientDataJSON, aAttestation);
-                })
-                .then(function(aParams) {
-                    append("getOut", "ClientData buffer: " + hexEncode(aAssertion.response.clientDataJSON) + "\n\n");
-                    append("getOut", "ClientDataHash: " + hexEncode(aParams.challengeParam) + "\n\n");
-                    return assembleSignedData(aParams.appParam, aParams.attestation.flags,
-                        aParams.attestation.counter, aParams.challengeParam);
-                })
-                .then(function(aSignedData) {
-                    append("getOut", "Signed Data assembled: " + aSignedData + "\n");
-                    console.log(state.publicKey, aSignedData, aAssertion.response.signature);
-                    return verifySignature(state.publicKey, aSignedData, getArrayBuffer("getOut", aAssertion.response.signature));
-                })
-                .then(function(aSignatureValid) {
-                    test("getOut", aSignatureValid, "The token signature must be valid.");
-                });
-        }).then(function (){
-        append("getOut", "\n\nRaw request:\n");
-        append("getOut", JSON.stringify(state.createRequest, null, 2) + "\n\n");
-    }).catch(function (aErr) {
-        if ("name" in aErr && (aErr.name == "AbortError" || aErr.name == "NS_ERROR_ABORT")) {
-            gResults.reset();
-            append("getOut", "Aborted; retry?\n");
-            displayError("Aborted; retry?\n");
-        } else {
-            gResults.fail();
-            append("getOut", "Got error:\n");
-            append("getOut", aErr.toString() + "\n\n");
-            displayError("Got error: "+aErr.toString());
-        }
-    }).then(function (){
-        resultColor("getOut");
-        append("getOut", gResults.toString() + "\n\n");
-
-        state.createRequest.challenge = base64url.encode(state.createRequest.challenge);
-
-        var response = {"request":state.createRequest,"response":publicKeyCredentialToJSON(state.assertion)};
-        fetch('/assertion/result', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(response)
-        }).then(function(data) {
-            if(data.ok && data.status === 200){
-                displaySuccess("Successful match ["+data.status+"-"+data.type+"]");
-            } else {
-                displayError("Failure ["+data.status+"-"+data.type+"]");
-            }
-        })
+    .then((response) => response.json())
+    .then((response) => {
+            if(response.status !== 'ok')
+                throw new Error(`Server responed with error. The message is: ${response.message}`);
+                console.info("Updated Response from FIDO RP server ", response)
+                var resp = preformatGetAssertReq(response)
+                console.info("Updated Response from FIDO RP server ", resp)
+                navigator.credentials.get({publicKey: resp})
+                .then(function(aAssertion) {
+                    var resp = JSON.stringify(publicKeyCredentialToJSON(aAssertion));
+                    console.info("Get Assertion Response " + response);
+                        fetch('/assertion/result', {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: {
+                            'Content-Type': 'application/json'
+                            },
+                        body: resp
+                    })
+                    .then(function(data) {
+                        if(data.ok && data.status === 200){
+                            displaySuccess("Successful match ["+data.status+"-"+data.type+"]");
+                        } else {
+                            displayError("Failure ["+data.status+"-"+data.type+"]");
+                        }
+                    })
+            }).catch(function (aErr) {
+                console.info("Unable to get Assertion Response ", JSON.stringify(aErr))
+            });
     });
-});
-
 }
 
 
