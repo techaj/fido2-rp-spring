@@ -536,18 +536,22 @@ function processRegisterForm(e) {
     .then((response) => {
             if(response.status !== 'ok')
                 throw new Error(`Server responed with error. The message is: ${response.message}`);
-            console.info("Updated Response from FIDO RP server ", response)
-            navigator.credentials.create({ publicKey: response})
-                .then(function (response){
-                       console.info("respones = " + JSON.stringify(response))
-                        var response = {"request":state.createRequest,"response":publicKeyCredentialToJSON(state.createResponse)};
+            let v = preformatMakeCredReq(response);
+            console.info("Updated Response from FIDO RP server ", v)
+            console.info("RP Domain = ", rpid)
+            v.rp.id = rpid;
+            navigator.credentials.create({ publicKey: v})
+                .then(function (aNewCredentialInfo){
+                       var response = publicKeyCredentialToJSON(aNewCredentialInfo);
+                       console.info("response = " + response)
+                       console.info("response = " + JSON.stringify(response))
                         fetch('/attestation/result', {
                             method: 'POST',
                             credentials: 'include',
                             headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(publicKeyCredentialToJSON(state.createResponse))
+                        body: JSON.stringify(response)
                         }
                         )
                         append("createOut", gResults.toString() + "\n\n");
