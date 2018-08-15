@@ -15,7 +15,11 @@ package com.mastercard.ess.fido2.service;
 import java.io.File;
 import java.io.IOException;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PublicKey;
+import java.security.SignatureException;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
@@ -52,14 +56,18 @@ public class CertificateValidator {
 
             Set<TrustAnchor> trustAnchors = trustChainCertificates.parallelStream().map(f -> new TrustAnchor(f, null)).collect(Collectors.toSet());
             PKIXParameters params = new PKIXParameters(trustAnchors);
-            params.setRevocationEnabled(false);
+
+
             CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
+//            PKIXRevocationChecker rc = (PKIXRevocationChecker)cpv.getRevocationChecker();
+//            rc.setOptions(EnumSet.of(PKIXRevocationChecker.Option.SOFT_FAIL,PKIXRevocationChecker.Option.PREFER_CRLS));
+//            params.addCertPathChecker(rc);
+            params.setRevocationEnabled(false);
             CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
             CertPath certPath = certFactory.generateCertPath(certs);
             try {
                 CertPathValidatorResult result = cpv.validate(certPath, params);
                 return certPath.getCertificates().get(0);
-
             } catch (CertPathValidatorException ex) {
                 LOGGER.warn("Cert not validated against the root {}", ex.getMessage());
                 throw new Fido2RPRuntimeException("Problem with certificate");
@@ -72,6 +80,17 @@ public class CertificateValidator {
     }
 
     private boolean isSelfSigned(X509Certificate cert) {
-        return cert.getIssuerDN().equals(cert.getSubjectDN());
+        try {
+            // Try to verify certificate signature with its own public key
+            PublicKey key = cert.getPublicKey();
+            cert.verify(key);
+            return cert.getIssuerDN().equals(cert.getSubjectDN());
+        } catch (SignatureException | InvalidKeyException | CertificateException | NoSuchAlgorithmException | NoSuchProviderException e) {
+            LOGGER.warn("Probably not self signed cert. Cert verification problem {}", e.getMessage());
+            return false;
+        }
+
     }
+
+
 }

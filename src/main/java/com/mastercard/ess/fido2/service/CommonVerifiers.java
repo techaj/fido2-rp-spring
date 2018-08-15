@@ -198,7 +198,7 @@ public class CommonVerifiers {
             if (!signatureChecker.verify(signature)) {
                 throw new Fido2RPRuntimeException("Unable to verify signature");
             }
-        } catch (InvalidKeyException | SignatureException e) {
+        } catch (IllegalArgumentException | InvalidKeyException | SignatureException e) {
             throw new Fido2RPRuntimeException("Can't verify the signature");
         }
     }
@@ -358,9 +358,6 @@ public class CommonVerifiers {
         if (!hasAtFlag && attestationBuffer.length > 0) {
             throw new Fido2RPRuntimeException("Invalid attestation data buffer");
         }
-//        if(!hasAtFlag && attestationBuffer.length==0){
-//            throw new Fido2RPRuntimeException("Invalid attestation data buffer");
-//        }
         if (hasAtFlag && attestationBuffer.length == 0) {
             throw new Fido2RPRuntimeException("Invalid attestation data buffer");
         }
@@ -492,6 +489,22 @@ public class CommonVerifiers {
         } catch (Exception e) {
             throw new Fido2RPRuntimeException("Wrong user verification parameter " + e.getMessage());
         }
+    }
+
+
+    public void verifyAttestationSignature(AuthData authData, byte[] clientDataHash, String signature, Certificate certificate, int signatureAlgorithm) {
+
+        int bufferSize = 0;
+        byte[] authDataBuffer = authData.getAttestationBuffer();
+        bufferSize += authDataBuffer.length;
+        bufferSize += clientDataHash.length;
+
+
+        byte[] signatureBase = ByteBuffer.allocate(bufferSize).put(authDataBuffer).put(clientDataHash).array();
+        byte[] signatureBytes = base64Decoder.decode(signature.getBytes());
+        LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
+        LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
+        verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
     }
 }
 

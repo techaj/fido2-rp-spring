@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.service.AttestationFormat;
 import com.mastercard.ess.fido2.service.AuthData;
@@ -21,19 +22,14 @@ import com.mastercard.ess.fido2.service.CertificateSelector;
 import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
-import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
-import java.io.ByteArrayInputStream;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +63,9 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;
 
+    @Autowired
+    CryptoUtils cryptoUtils;
+
     @Override
     public AttestationFormat getAttestationFormat() {
         return AttestationFormat.fido_u2f;
@@ -87,15 +86,8 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
             while (i.hasNext()) {
                 certificatePath.add(i.next().asText());
             }
-            List<X509Certificate> certificates = certificatePath.parallelStream().map(f -> getCertificate(f)).filter(c -> {
-                try {
-                    c.checkValidity();
-                    return true;
-                } catch (CertificateException e) {
-                    LOGGER.warn("Certificate not valid {}" + c.getIssuerDN().getName());
-                    throw new Fido2RPRuntimeException("Certificate not valid ");
-                }
-            }).collect(Collectors.toList());
+            List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
+
 //                            certificateValidator.saveCertificate(certificate);
 
             credIdAndCounters.setSignatureAlgorithm(alg);
@@ -115,11 +107,5 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
         credIdAndCounters.setUncompressedEcPoint(base64UrlEncoder.encodeToString(authData.getCOSEPublicKey()));
     }
 
-    X509Certificate getCertificate(String x5c) {
-        try {
-            return (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x5c)));
-        } catch (CertificateException e) {
-            throw new Fido2RPRuntimeException(e.getMessage());
-        }
-    }
+
 }

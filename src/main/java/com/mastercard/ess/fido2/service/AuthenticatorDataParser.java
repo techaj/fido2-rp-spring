@@ -123,7 +123,7 @@ public class AuthenticatorDataParser {
             byte[] leftovers = Arrays.copyOfRange(buffer, offset, buffer.length);
             commonVerifiers.verifyNoLeftovers(leftovers);
         }
-
+        authData.setAttestationBuffer(buffer);
 
 
         return authData;

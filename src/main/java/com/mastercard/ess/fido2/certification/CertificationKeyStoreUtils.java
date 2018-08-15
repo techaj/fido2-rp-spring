@@ -21,6 +21,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Iterator;
@@ -51,6 +52,33 @@ public class CertificationKeyStoreUtils {
     @Autowired
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;
+
+
+    public List<X509Certificate> getCertificates() {
+        final CertificateFactory cf;
+        try {
+            cf = CertificateFactory.getInstance("X.509");
+        } catch (CertificateException e) {
+            throw new Fido2RPRuntimeException(e.getMessage());
+        }
+        Map<String, JsonNode> metadata = metadataProcessor.getMetadata();
+        List<X509Certificate> certificates = metadata.entrySet().stream().map(de -> {
+            List<X509Certificate> certs = new ArrayList<>();
+            Iterator<JsonNode> iter = de.getValue().get("attestationRootCertificates").iterator();
+            while (iter.hasNext()) {
+                try {
+                    JsonNode certNode = iter.next();
+                    ByteArrayInputStream certBytes = new ByteArrayInputStream(base64Decoder.decode(certNode.asText().getBytes("UTF-8")));
+                    certs.add((X509Certificate) cf.generateCertificate(certBytes));
+                } catch (CertificateException | UnsupportedEncodingException e) {
+                    LOGGER.warn("Problem processing {} {}", de.getKey(), e.getMessage());
+                }
+            }
+            return certs;
+        }).flatMap(ch -> ch.stream()).collect(Collectors.toList());
+        return certificates;
+
+    }
 
     public KeyStore getCertificationKeyStore() {
         final CertificateFactory cf;
