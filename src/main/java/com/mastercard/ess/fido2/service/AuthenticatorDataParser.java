@@ -58,7 +58,11 @@ public class AuthenticatorDataParser {
         AuthData authData = new AuthData();
         byte[] buffer;
 
-        buffer = base64Decoder.decode(incomingAuthData.getBytes());
+        if (isAttestation)
+            buffer = base64Decoder.decode(incomingAuthData.getBytes());
+        else {
+            buffer = base64UrlDecoder.decode(incomingAuthData.getBytes());
+        }
         authData.setAuthDataDecoded(buffer);
         int offset = 0;
         byte[] rpIdHashBuffer = Arrays.copyOfRange(buffer, offset, offset += 32);

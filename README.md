@@ -9,8 +9,6 @@ The implementation is based on code provided in following projects:
 This is mostly a port from JavaScript into Java/SpringBoot world and in theory you could run on any Pivotal Cloud Foundry certified platform.   
 
 # Requirements
-Java 8 with Java Cryptography Extension enabled.
-
 Gradle available on the class path. We have been using version 4.4.
 
 Ideally you would also have a FIDO2 authenticator. We have used  [Yubico Security Key](https://www.yubico.com/product/security-key-by-yubico/).

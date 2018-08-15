@@ -21,6 +21,7 @@ import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationRepository;
 import com.mastercard.ess.fido2.database.RegistrationStatus;
 import com.mastercard.ess.fido2.service.AuthenticatorAttestationVerifier;
+import com.mastercard.ess.fido2.service.ChallengeGenerator;
 import com.mastercard.ess.fido2.service.ChallengeVerifier;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
@@ -57,6 +58,9 @@ class AttestationService {
     DomainVerifier domainVerifier;
 
     @Autowired
+    ChallengeGenerator challengeGenerator;
+
+    @Autowired
     CommonVerifiers commonVerifiers;
     @Autowired
     private ObjectMapper om;
@@ -89,13 +93,14 @@ class AttestationService {
             new Fido2RPRuntimeException("Can't parse message");
         }
 
+
         commonVerifiers.verifyClientJSON(clientDataJSONNode);
         commonVerifiers.verifyClientJSONTypeIsCreate(clientDataJSONNode);
         JsonNode keyIdNode = params.get("id");
         String keyId = commonVerifiers.verifyBase64UrlString(keyIdNode);
 
 
-        String clientDataChallenge = clientDataJSONNode.get("challenge").asText();
+        String clientDataChallenge = base64UrlEncoder.withoutPadding().encodeToString(base64UrlDecoder.decode(clientDataJSONNode.get("challenge").asText()));
         LOGGER.info("Challenge {}", clientDataChallenge);
 //        String clientDataOrigin = clientDataJSONNode.get("origin").asText();
 
@@ -164,9 +169,8 @@ class AttestationService {
 
         String credentialType = params.hasNonNull("credentialType") ? params.get("credentialType").asText("public-key") : "public-key";
         ObjectNode credentialCreationOptionsNode = om.createObjectNode();
-        byte buffer[] = new byte[32];
-        new SecureRandom().nextBytes(buffer);
-        String challenge = base64UrlEncoder.encodeToString(buffer);
+
+        String challenge = challengeGenerator.getChallenge();
         credentialCreationOptionsNode.put("challenge", challenge);
         LOGGER.info("Challenge {}", challenge);
         ObjectNode credentialRpEntityNode = credentialCreationOptionsNode.putObject("rp");
@@ -174,6 +178,7 @@ class AttestationService {
         credentialRpEntityNode.put("id", documentDomain);
 
         ObjectNode credentialUserEntityNode = credentialCreationOptionsNode.putObject("user");
+        byte[] buffer = new byte[32];
         new SecureRandom().nextBytes(buffer);
         String userId = base64UrlEncoder.encodeToString(buffer);
         credentialUserEntityNode.put("id", userId);

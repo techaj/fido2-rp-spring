@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 public class CommonVerifiers {
@@ -315,6 +316,15 @@ public class CommonVerifiers {
         return node.asText();
     }
 
+    public String verifyThatNonEmptyString(JsonNode node) {
+        String value = verifyThatString(node);
+        if (StringUtils.isEmpty(value)) {
+            throw new Fido2RPRuntimeException("Invalid field " + node.fieldNames().next());
+        } else {
+            return value;
+        }
+    }
+
     public String verifyAuthData(JsonNode node) {
         if (node.isNull()) {
             throw new Fido2RPRuntimeException("Empty auth data");
@@ -439,8 +449,10 @@ public class CommonVerifiers {
     }
 
     void verifyClientJSONType(JsonNode clientJsonNode, String type) {
-        if (!type.equals(clientJsonNode.get("type").asText())) {
-            throw new Fido2RPRuntimeException("Invalid client json parameters");
+        if (clientJsonNode.has("type")) {
+            if (!type.equals(clientJsonNode.get("type").asText())) {
+                throw new Fido2RPRuntimeException("Invalid client json parameters");
+            }
         }
     }
 

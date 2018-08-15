@@ -41,6 +41,11 @@ public class GlobalBeans {
         return Base64.getUrlEncoder().withoutPadding();
     }
 
+    @Bean(name = "base64Encoder")
+    public Base64.Encoder getBase64Encoder() {
+        return Base64.getEncoder().withoutPadding();
+    }
+
     @Bean(name="base64UrlDecoder")
     public Base64.Decoder getBase64UrlDecoder() {
         return Base64.getUrlDecoder();

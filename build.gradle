@@ -84,6 +84,12 @@ dependencies {
     testCompile('org.mockito:mockito-all:1.10.19')
 
 
+    compile 'org.apache.httpcomponents:httpclient:4.5.2'
+    compile 'com.google.http-client:google-http-client-jackson2:1.22.0'
+
+    compile 'com.nimbusds:nimbus-jose-jwt:6.0'
+
+
 
 
     compile("org.webjars:bootstrap:3.3.7")
