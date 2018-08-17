@@ -83,7 +83,9 @@ class AssertionService {
 
         commonVerifiers.verifyBasicPayload(params);
         String keyId = commonVerifiers.verifyThatString(params.get("id"));
+        commonVerifiers.verifyAssertionType(params.get("type"));
         commonVerifiers.verifyThatString(params.get("rawId"));
+        commonVerifiers.verifyThatString(params.get("response").get("userHandle"));
 
         JsonNode clientDataJSONNode;
         try {
@@ -171,6 +173,7 @@ class AssertionService {
         entity.setChallenge(challenge);
         entity.setDomain(host);
         entity.setW3cCredentialRequestOptions(assertionOptionsResponseNode.toString());
+        entity.setUserVerificationOption(userVerification);
 
         authenticationsRepository.save(entity);
         assertionOptionsResponseNode.put("status", "ok");

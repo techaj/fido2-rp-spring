@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.ctap.UserVerification;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.service.AttestationFormat;
@@ -60,7 +61,18 @@ public class PackedAssertionFormatProcessor implements AssertionFormatProcessor 
 
     public void process(String base64AuthenticatorData, String signature, String clientDataJson, FIDO2RegistrationEntity registration, FIDO2AuthenticationEntity authenticationEntity) {
         AuthData authData = authenticatorDataParser.parseAssertionData(base64AuthenticatorData);
-        commonVerifiers.verifyUserPresent(authData);
+        commonVerifiers.verifyRpIdHash(authData, registration.getDomain());
+
+        if (UserVerification.valueOf(authenticationEntity.getUserVerificationOption()) == UserVerification.required) {
+            commonVerifiers.verifyRequiredUserPresent(authData);
+        }
+        if (UserVerification.valueOf(authenticationEntity.getUserVerificationOption()) == UserVerification.preferred) {
+            commonVerifiers.verifyPreferredUserPresent(authData);
+        }
+        if (UserVerification.valueOf(authenticationEntity.getUserVerificationOption()) == UserVerification.discouraged) {
+            commonVerifiers.verifyDiscouragedUserPresent(authData);
+        }
+
         byte[] clientDataHash = DigestUtils.getSha256Digest().digest(base64UrlDecoder.decode(clientDataJson));
 
         try {

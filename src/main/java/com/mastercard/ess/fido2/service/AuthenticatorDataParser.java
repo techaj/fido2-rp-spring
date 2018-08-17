@@ -94,8 +94,9 @@ public class AuthenticatorDataParser {
             CBORFactory f = new CBORFactory();
 
             long keySize = 0;
+            CBORParser parser = null;
             try {
-                CBORParser parser = f.createParser(cosePublicKeyBuffer);
+                parser = f.createParser(cosePublicKeyBuffer);
                 while (!parser.isClosed()) {
                     JsonToken t = parser.nextToken();
                     JsonLocation tocloc = parser.getTokenLocation();
@@ -104,9 +105,16 @@ public class AuthenticatorDataParser {
                         break;
                     }
                 }
-                parser.close();
             } catch (IOException e) {
                 throw new Fido2RPRuntimeException(e.getMessage());
+            } finally {
+                if (parser != null) {
+                    try {
+                        parser.close();
+                    } catch (IOException e) {
+                        LOGGER.info("exception when closing a parser {}", e.getMessage());
+                    }
+                }
             }
             offset += keySize;
             ObjectMapper mapper = new ObjectMapper(f);

@@ -72,13 +72,13 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
     }
 
     @Override
-    public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity credential, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
+    public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity registration, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
         int alg = -7;
 
         String signature = commonVerifiers.verifyBase64String(attStmt.get("sig"));
         commonVerifiers.verifyAAGUIDZeroed(authData);
         commonVerifiers.verifyUserPresent(authData);
-        commonVerifiers.verifyRpIdHash(authData, credential.getDomain());
+        commonVerifiers.verifyRpIdHash(authData, registration.getDomain());
 
         if (attStmt.hasNonNull("x5c")) {
             Iterator<JsonNode> i = attStmt.get("x5c").elements();

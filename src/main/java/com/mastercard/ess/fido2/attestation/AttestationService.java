@@ -118,6 +118,7 @@ class AttestationService {
         credentialFound.setStatus(RegistrationStatus.REGISTERED);
         credentialFound.setW3cAuthenticatorAttenstationResponse(response.toString());
         credentialFound.setSignatureAlgorithm(attestationData.getSignatureAlgorithm());
+        credentialFound.setCounter(attestationData.getCounters());
         if (attestationData.getCredId() != null) {
             credentialFound.setPublicKeyId(attestationData.getCredId());
         } else {

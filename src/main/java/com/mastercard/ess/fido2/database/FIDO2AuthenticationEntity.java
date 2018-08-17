@@ -53,6 +53,9 @@ public class FIDO2AuthenticationEntity extends FIDO2Entity {
     @Column(name = "AuthenticatorAttestationResponse")
     private String w3cAuthenticatorAssertionResponse;
 
+    @Column(name = "UserVerification", length = 255)
+    private String userVerificationOption;
+
 
     public String getUserId() {
         return userId;
@@ -129,5 +132,13 @@ public class FIDO2AuthenticationEntity extends FIDO2Entity {
     @Override
     public int hashCode() {
         return super.hashCode();    // Sonar complains that equals/hashCode should be defined here
+    }
+
+    public String getUserVerificationOption() {
+        return userVerificationOption;
+    }
+
+    public void setUserVerificationOption(String userVerificationOption) {
+        this.userVerificationOption = userVerificationOption;
     }
 }

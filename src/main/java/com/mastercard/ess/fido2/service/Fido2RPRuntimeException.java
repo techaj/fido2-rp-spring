@@ -19,11 +19,13 @@ public class Fido2RPRuntimeException extends RuntimeException{
     private final String errorMessage;
 
     public Fido2RPRuntimeException(String errorMessage){
+        super(errorMessage);
         this.status = "failed";
         this.errorMessage = errorMessage;
     }
 
     public Fido2RPRuntimeException(String status, String errorMessage){
+        super(errorMessage);
         this.status = status;
         this.errorMessage = errorMessage;
     }

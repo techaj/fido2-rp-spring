@@ -21,6 +21,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.PublicKey;
@@ -45,8 +46,10 @@ import org.springframework.util.StringUtils;
 @Service
 public class CommonVerifiers {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommonVerifiers.class);
-    private static final byte U2F_USER_PRESENTED = 0x01;
-    private static final byte ATTESTATION_DATA_FLAG = 0x40;
+    private static final int FLAG_USER_PRESENT = 0x01;
+    private static final int FLAG_ATTESTED_CREDENTIAL_DATA_INCLUDED = 0x40;
+    private static final int FLAG_USER_VERIFIED = 0x04;
+    private static final int FLAG_EXTENSION_DATA_INCLUDED = 0x80;
 
     @Autowired
     @Qualifier("base64UrlDecoder")
@@ -141,10 +144,18 @@ public class CommonVerifiers {
     }
 
     public boolean verifyUserPresent(AuthData authData) {
-        if ((authData.getFlags()[0] & U2F_USER_PRESENTED) == 1) {
+        if ((authData.getFlags()[0] & FLAG_USER_PRESENT) == 1) {
             return true;
         } else {
             throw new Fido2RPRuntimeException("User not present");
+        }
+    }
+
+    public boolean verifyUserVerified(AuthData authData) {
+        if ((authData.getFlags()[0] & FLAG_USER_VERIFIED) == 1) {
+            return true;
+        } else {
+            throw new Fido2RPRuntimeException("User not verified");
         }
     }
 
@@ -186,7 +197,7 @@ public class CommonVerifiers {
         }
     }
 
-    private void verifySignature(byte[] signature, byte[] signatureBase, Certificate certificate, int signatureAlgorithm) {
+    public void verifySignature(byte[] signature, byte[] signatureBase, Certificate certificate, int signatureAlgorithm) {
         verifySignature(signature, signatureBase, certificate.getPublicKey(), signatureAlgorithm);
     }
 
@@ -270,6 +281,28 @@ public class CommonVerifiers {
         }
     }
 
+    public MessageDigest getDigest(int signatureAlgorithm) {
+
+        //https://www.iana.org/assignments/cose/cose.xhtml#algorithms
+        switch (signatureAlgorithm) {
+            case -257: {
+                return DigestUtils.getSha256Digest();
+            }
+
+            case -65535: {
+                return DigestUtils.getSha1Digest();
+            }
+
+
+            default: {
+                throw new Fido2RPRuntimeException("Unknown mapping ");
+            }
+
+        }
+
+
+    }
+
     public void verifyOptions(JsonNode params) {
         long count = Arrays.asList(
                 params.hasNonNull("username")
@@ -351,7 +384,7 @@ public class CommonVerifiers {
     }
 
     public boolean verifyAtFlag(byte[] flags) {
-        return (flags[0] & ATTESTATION_DATA_FLAG) == ATTESTATION_DATA_FLAG;
+        return (flags[0] & FLAG_ATTESTED_CREDENTIAL_DATA_INCLUDED) == FLAG_ATTESTED_CREDENTIAL_DATA_INCLUDED;
     }
 
     public void verifyAttestationBuffer(boolean hasAtFlag, byte[] attestationBuffer) {
@@ -505,6 +538,35 @@ public class CommonVerifiers {
         LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
         LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
         verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
+    }
+
+    public String verifyAssertionType(JsonNode typeNode) {
+        String type = verifyThatString(typeNode);
+        if (!"public-key".equals(type)) {
+            throw new Fido2RPRuntimeException("Invalid type");
+        }
+        return type;
+    }
+
+    public void verifyRequiredUserPresent(AuthData authData) {
+        byte flags = authData.getFlags()[0];
+        if (((flags & FLAG_USER_PRESENT) == 0) && ((flags & FLAG_USER_VERIFIED) == 0)) {
+            throw new Fido2RPRuntimeException("User required not present");
+        }
+    }
+
+    public void verifyPreferredUserPresent(AuthData authData) {
+        byte flags = authData.getFlags()[0];
+//        if ( ((flags & FLAG_USER_PRESENT)  == 0) && ((flags & FLAG_USER_VERIFIED) == 0)) {
+//            throw new Fido2RPRuntimeException("User required not present");
+//        }
+    }
+
+    public void verifyDiscouragedUserPresent(AuthData authData) {
+        byte flags = authData.getFlags()[0];
+        if (((flags & FLAG_USER_PRESENT) == 1) && ((flags & FLAG_USER_VERIFIED) == 1)) {
+            throw new Fido2RPRuntimeException("User discouraged is present present");
+        }
     }
 }
 

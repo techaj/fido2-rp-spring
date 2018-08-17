@@ -13,7 +13,6 @@
 package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
 import com.mastercard.ess.fido2.cryptoutils.AndroidKeyUtils;
 import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
@@ -45,9 +44,6 @@ public class AndroidKeyAttestationProcessor implements AttestationFormatProcesso
     private static final Logger LOGGER = LoggerFactory.getLogger(AndroidKeyAttestationProcessor.class);
     @Autowired
     CommonVerifiers commonVerifiers;
-    @Autowired
-    @Qualifier("cborMapper")
-    ObjectMapper cborMapper;
 
     @Autowired
     CryptoUtils cryptoUtils;
@@ -102,6 +98,7 @@ public class AndroidKeyAttestationProcessor implements AttestationFormatProcesso
         }
         String signature = commonVerifiers.verifyBase64String(attStmt.get("sig"));
         commonVerifiers.verifyAttestationSignature(authData, clientDataHash, signature, verifiedCert, authData.getKeyType());
+
 
 //        credIdAndCounters.setAttestationType(getAttestationFormat().getFmt());
 //        credIdAndCounters.setCredId(base64UrlEncoder.encodeToString(authData.getCredId()));

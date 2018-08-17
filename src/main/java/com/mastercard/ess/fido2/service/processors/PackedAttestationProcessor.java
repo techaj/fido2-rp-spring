@@ -73,7 +73,7 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     }
 
     @Override
-    public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity credential, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
+    public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity registration, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
         int alg = commonVerifiers.verifyAlgorithm(attStmt.get("alg"), authData.getKeyType());
         String signature = commonVerifiers.verifyBase64String(attStmt.get("sig"));
 
