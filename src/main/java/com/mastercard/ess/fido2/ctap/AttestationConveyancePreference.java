@@ -10,19 +10,8 @@
  * See the License for the specific language governing permissions and limitations under the License.
  */
 
-package com.mastercard.ess.fido2.service.processors;
+package com.mastercard.ess.fido2.ctap;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.mastercard.ess.fido2.ctap.AttestationFormat;
-import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import com.mastercard.ess.fido2.service.AuthData;
-import com.mastercard.ess.fido2.service.CredAndCounterData;
-
-
-public interface AttestationFormatProcessor {
-    AttestationFormat getAttestationFormat();
-
-    void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity credential, byte[] clientDataHash, CredAndCounterData credIdAndCounters);
-
-
+public enum AttestationConveyancePreference {
+    direct, indirect, none
 }

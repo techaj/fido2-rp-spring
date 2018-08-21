@@ -35,6 +35,7 @@ public class KeyStoreCreator {
     @Qualifier("base64Encoder")
     private Base64.Encoder base64Encoder;
 
+
     public KeyStore createKeyStore(List<CertificateHolder> certificates) {
         byte[] password = new byte[200];
         new SecureRandom().nextBytes(password);

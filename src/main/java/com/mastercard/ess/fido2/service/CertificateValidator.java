@@ -30,33 +30,44 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CertificateValidator {
     private static final Logger LOGGER = LoggerFactory.getLogger(CertificateValidator.class);
 
+    @Autowired
+    @Qualifier("base64Encoder")
+    private Base64.Encoder base64Encoder;
+
+
     void saveCertificate(X509Certificate certificate) throws IOException {
         FileUtils.writeStringToFile(new File("c:/tmp/cert-" + certificate.getSerialNumber() + ".crt"), certificate.toString());
     }
 
 
-    public Certificate verifyCert(List<X509Certificate> certs, List<X509Certificate> trustChainCertificates) {
+    void checkForTrustedCertsInAttestation(List<X509Certificate> attestationCerts, List<X509Certificate> trustChainCertificates) {
+        final List<String> trustedSignatures = trustChainCertificates.stream().map(cert -> base64Encoder.encodeToString(cert.getSignature())).collect(Collectors.toList());
+        List<String> duplicateSignatures = attestationCerts.stream().map(cert -> base64Encoder.encodeToString(cert.getSignature())).filter(sig -> trustedSignatures.contains(sig)).collect(Collectors.toList());
+        if (!duplicateSignatures.isEmpty()) {
+            throw new Fido2RPRuntimeException("Root certificate in the attestation ");
+        }
+    }
+
+    public X509Certificate verifyAttestationCertificates(List<X509Certificate> certs, List<X509Certificate> trustChainCertificates) {
         try {
-
-            if (isSelfSigned(certs.get(0))) {
-                return null;
-            }
-
+            checkForTrustedCertsInAttestation(certs, trustChainCertificates);
             Set<TrustAnchor> trustAnchors = trustChainCertificates.parallelStream().map(f -> new TrustAnchor(f, null)).collect(Collectors.toSet());
             PKIXParameters params = new PKIXParameters(trustAnchors);
-
 
             CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
 //            PKIXRevocationChecker rc = (PKIXRevocationChecker)cpv.getRevocationChecker();
@@ -65,9 +76,14 @@ public class CertificateValidator {
             params.setRevocationEnabled(false);
             CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
             CertPath certPath = certFactory.generateCertPath(certs);
+            List<? extends Certificate> orderedCerts = certPath.getCertificates();
+            X509Certificate potentialRootCert = (X509Certificate) orderedCerts.get(orderedCerts.size() - 1);
+//            if (isSelfSigned(potentialRootCert)) {
+//                throw new Fido2RPRuntimeException("Self signed root certificate");
+//            }
             try {
                 CertPathValidatorResult result = cpv.validate(certPath, params);
-                return certPath.getCertificates().get(0);
+                return (X509Certificate) certPath.getCertificates().get(0);
             } catch (CertPathValidatorException ex) {
                 LOGGER.warn("Cert not validated against the root {}", ex.getMessage());
                 throw new Fido2RPRuntimeException("Problem with certificate");
@@ -79,18 +95,21 @@ public class CertificateValidator {
         }
     }
 
-    private boolean isSelfSigned(X509Certificate cert) {
-        try {
-            // Try to verify certificate signature with its own public key
-            PublicKey key = cert.getPublicKey();
-            cert.verify(key);
-            return cert.getIssuerDN().equals(cert.getSubjectDN());
-        } catch (SignatureException | InvalidKeyException | CertificateException | NoSuchAlgorithmException | NoSuchProviderException e) {
-            LOGGER.warn("Probably not self signed cert. Cert verification problem {}", e.getMessage());
-            return false;
-        }
+
+    public boolean isSelfSigned(X509Certificate cert) {
+        return isSelfSigned(cert, cert.getPublicKey());
 
     }
 
 
+    public boolean isSelfSigned(X509Certificate cert, PublicKey key) {
+        try {
+            // Try to verify certificate signature with its own public key
+            cert.verify(key);
+            return cert.getIssuerDN().equals(cert.getSubjectDN());
+        } catch (SignatureException | CertificateException | InvalidKeyException | NoSuchAlgorithmException | NoSuchProviderException e) {
+            LOGGER.warn("Probably not self signed cert. Cert verification problem {}", e.getMessage());
+            return false;
+        }
+    }
 }

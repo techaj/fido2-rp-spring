@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.mastercard.ess.fido2.ctap.AttestationConveyancePreference;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationRepository;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationRepository;
@@ -112,9 +113,8 @@ class AttestationService {
 
         domainVerifier.verifyDomain(credentialFound.getDomain(), clientDataJSONNode.get("origin").asText());
         CredAndCounterData attestationData = authenticatorAttestationVerifier.verifyAuthenticatorAttestationResponse(response, credentialFound);
-        credentialFound.setAttestationType(attestationData.getAttestationType());
+
         credentialFound.setUncompressedECPoint(attestationData.getUncompressedEcPoint());
-        credentialFound.setAttestationType(attestationData.getAttestationType());
         credentialFound.setStatus(RegistrationStatus.REGISTERED);
         credentialFound.setW3cAuthenticatorAttenstationResponse(response.toString());
         credentialFound.setSignatureAlgorithm(attestationData.getSignatureAlgorithm());
@@ -165,7 +165,7 @@ class AttestationService {
 
 
         LOGGER.info("Options {} {} {}", username, displayName, documentDomain);
-        String attestationType = commonVerifiers.verifyAttestationType(params);
+        AttestationConveyancePreference attestationType = commonVerifiers.verifyAttestationConveyanceType(params);
 
 
         String credentialType = params.hasNonNull("credentialType") ? params.get("credentialType").asText("public-key") : "public-key";
@@ -185,7 +185,7 @@ class AttestationService {
         credentialUserEntityNode.put("id", userId);
         credentialUserEntityNode.put("name", username);
         credentialUserEntityNode.put("displayName", displayName);
-        credentialCreationOptionsNode.put("attestation", attestationType);
+        credentialCreationOptionsNode.put("attestation", attestationType.toString());
         ArrayNode credentialParametersArrayNode = credentialCreationOptionsNode.putArray("pubKeyCredParams");
         ObjectNode credentialParametersNode = credentialParametersArrayNode.addObject();
         if ("public-key".equals(credentialType)) {
@@ -211,9 +211,9 @@ class AttestationService {
         entity.setUsername(username);
         entity.setUserId(userId);
         entity.setChallenge(challenge);
-
         entity.setDomain(host);
         entity.setW3cCredentialCreationOptions(credentialCreationOptionsNode.toString());
+        entity.setAttestationType(attestationType.toString());
         registrationsRepository.save(entity);
         return credentialCreationOptionsNode;
     }

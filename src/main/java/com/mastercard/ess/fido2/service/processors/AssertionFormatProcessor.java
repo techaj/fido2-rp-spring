@@ -12,9 +12,9 @@
 
 package com.mastercard.ess.fido2.service.processors;
 
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import com.mastercard.ess.fido2.service.AttestationFormat;
 
 public interface AssertionFormatProcessor {
 

@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.ctap.AttestationConveyancePreference;
 import com.mastercard.ess.fido2.ctap.UserVerification;
 import com.mastercard.ess.fido2.service.processors.AttestationFormatProcessor;
 import java.io.IOException;
@@ -113,7 +114,7 @@ public class CommonVerifiers {
         verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
     }
 
-    public void verifyPackedAttestationSignature(byte[] authData, byte[] clientDataHash, String signature, Certificate certificate, int signatureAlgorithm) {
+    public void verifyPackedAttestationSignature(byte[] authData, byte[] clientDataHash, String signature, PublicKey key, int signatureAlgorithm) {
         int bufferSize = 0;
 
         bufferSize += authData.length;
@@ -123,7 +124,11 @@ public class CommonVerifiers {
         LOGGER.info("Signature {}", Hex.encodeHexString(signatureBytes));
         LOGGER.info("Signature Base {}", Hex.encodeHexString(signatureBase));
         LOGGER.info("Signature BaseLen {}", signatureBase.length);
-        verifySignature(signatureBytes, signatureBase, certificate, signatureAlgorithm);
+        verifySignature(signatureBytes, signatureBase, key, signatureAlgorithm);
+    }
+
+    public void verifyPackedAttestationSignature(byte[] authData, byte[] clientDataHash, String signature, Certificate certificate, int signatureAlgorithm) {
+        verifyPackedAttestationSignature(authData, clientDataHash, signature, certificate.getPublicKey(), signatureAlgorithm);
     }
 
     public void verifyAssertionSignature(AuthData authData, byte[] clientDataHash, String signature, ECPublicKey publicKey, int signatureAlgorithm) {
@@ -466,11 +471,12 @@ public class CommonVerifiers {
         }
     }
 
-    public String verifyAttestationType(JsonNode params) {
+    public AttestationConveyancePreference verifyAttestationConveyanceType(JsonNode params) {
         if (params.has("attestation")) {
-            return verifyThatString(params.get("attestation"));
+            String type = verifyThatString(params.get("attestation"));
+            return AttestationConveyancePreference.valueOf(type);
         } else {
-            return "direct";
+            return AttestationConveyancePreference.direct;
         }
     }
 

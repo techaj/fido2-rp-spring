@@ -16,8 +16,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
 import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import com.mastercard.ess.fido2.service.AttestationFormat;
 import com.mastercard.ess.fido2.service.AuthData;
 import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
@@ -105,7 +105,7 @@ public class TPMProcessor implements AttestationFormatProcessor {
             List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
             List<X509Certificate> aikCertificates = cryptoUtils.getCertficates(aikCertificatePath);
             List<X509Certificate> trustAnchorCertificates = utils.getCertificates();
-            X509Certificate verifiedCert = (X509Certificate) certificateValidator.verifyCert(certificates, trustAnchorCertificates);
+            X509Certificate verifiedCert = (X509Certificate) certificateValidator.verifyAttestationCertificates(certificates, trustAnchorCertificates);
             X509Certificate aikCertificate = aikCertificates.get(0);
 
             verifyTPMCertificateExtenstion(aikCertificate, authData);

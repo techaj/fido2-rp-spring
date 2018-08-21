@@ -49,6 +49,7 @@ public class CertificationKeyStoreUtils {
     @Autowired
     KeyStoreCreator keyStoreCreator;
 
+
     @Autowired
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;
@@ -113,7 +114,7 @@ public class CertificationKeyStoreUtils {
         TrustManagerFactory trustManagerFactory = null;
         try {
 
-            trustManagerFactory = TrustManagerFactory.getInstance("X509");
+            trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(keyStore);
             TrustManager[] tms = trustManagerFactory.getTrustManagers();
 

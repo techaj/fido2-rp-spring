@@ -12,7 +12,7 @@
 
 package com.mastercard.ess.fido2.service.processors;
 
-import com.mastercard.ess.fido2.service.AttestationFormat;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.util.EnumMap;
 import java.util.List;

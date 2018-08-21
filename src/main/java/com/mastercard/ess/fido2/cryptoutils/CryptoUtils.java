@@ -36,9 +36,10 @@ public class CryptoUtils {
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;
 
+
     public X509Certificate getCertificate(String x5c) {
         try {
-            return (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x5c)));
+            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x5c)));
         } catch (CertificateException e) {
             throw new Fido2RPRuntimeException(e.getMessage());
         }

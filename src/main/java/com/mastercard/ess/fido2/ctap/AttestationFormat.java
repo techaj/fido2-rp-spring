@@ -10,10 +10,10 @@
  * See the License for the specific language governing permissions and limitations under the License.
  */
 
-package com.mastercard.ess.fido2.service;
+package com.mastercard.ess.fido2.ctap;
 
 public enum AttestationFormat {
-    fido_u2f("fido-u2f"), packed("packed"), tpm("tpm"), android_key("android-key"), android_safetynet("android-safetynet");
+    fido_u2f("fido-u2f"), packed("packed"), tpm("tpm"), android_key("android-key"), android_safetynet("android-safetynet"), none("none");
     private final String fmt;
 
     AttestationFormat(String fmt) {

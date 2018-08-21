@@ -15,8 +15,8 @@ package com.mastercard.ess.fido2.service.processors;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import com.mastercard.ess.fido2.service.AttestationFormat;
 import com.mastercard.ess.fido2.service.AuthData;
 import com.mastercard.ess.fido2.service.CertificateSelector;
 import com.mastercard.ess.fido2.service.CertificateValidator;
@@ -92,7 +92,7 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
 
             credIdAndCounters.setSignatureAlgorithm(alg);
             List<X509Certificate> trustAnchorCertificates = certificateSelector.selectRootCertificate(certificates.get(0));
-            Certificate verifiedCert = certificateValidator.verifyCert(certificates, trustAnchorCertificates);
+            Certificate verifiedCert = certificateValidator.verifyAttestationCertificates(certificates, trustAnchorCertificates);
             commonVerifiers.verifyU2FAttestationSignature(authData, clientDataHash, signature, verifiedCert, alg);
 
         } else if (attStmt.hasNonNull("ecdaaKeyId")) {

@@ -16,7 +16,7 @@ package com.mastercard.ess.fido2.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
-import com.mastercard.ess.fido2.service.AttestationFormat;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import java.security.Provider;
 import java.util.Arrays;
 import java.util.Base64;

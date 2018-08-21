@@ -75,7 +75,7 @@ public class UncompressedECPointHelper {
     public ECPublicKey convertUncompressedPointToECKey(final byte[] uncompressedPoint, int curve) {
         AlgorithmParameters parameters = null;
         try {
-            parameters = AlgorithmParameters.getInstance("EC", provider);
+            parameters = AlgorithmParameters.getInstance("EC");
 
             parameters.init(new ECGenParameterSpec(convertCoseCurveToSunCurveName(curve)));
             ECParameterSpec params = parameters.getParameterSpec(ECParameterSpec.class);
@@ -101,7 +101,7 @@ public class UncompressedECPointHelper {
                     uncompressedPoint, offset, offset + keySizeBytes));
             final ECPoint w = new ECPoint(x, y);
             final ECPublicKeySpec ecPublicKeySpec = new ECPublicKeySpec(w, params);
-            final KeyFactory keyFactory = KeyFactory.getInstance("EC", provider);
+            final KeyFactory keyFactory = KeyFactory.getInstance("EC");
             return (ECPublicKey) keyFactory.generatePublic(ecPublicKeySpec);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | InvalidParameterSpecException e) {
             throw new Fido2RPRuntimeException(e.getMessage());
