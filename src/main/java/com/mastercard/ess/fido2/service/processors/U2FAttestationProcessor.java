@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
 import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
@@ -22,7 +23,6 @@ import com.mastercard.ess.fido2.service.CertificateSelector;
 import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
-import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
@@ -52,7 +52,7 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
     @Autowired
     CertificateValidator certificateValidator;
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
+    COSEHelper uncompressedECPointHelper;
     @Autowired
     @Qualifier("base64UrlDecoder")
     private Base64.Decoder base64UrlDecoder;

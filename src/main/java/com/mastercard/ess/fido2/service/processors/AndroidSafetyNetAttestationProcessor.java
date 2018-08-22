@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.safetynet.AttestationStatement;
 import com.google.safetynet.OfflineVerify;
 import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
+import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.service.AuthData;
@@ -25,7 +26,6 @@ import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
-import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
 import java.nio.ByteBuffer;
 import java.security.KeyStore;
 import java.time.Instant;
@@ -56,7 +56,7 @@ public class AndroidSafetyNetAttestationProcessor implements AttestationFormatPr
     @Autowired
     CertificateValidator certificateValidator;
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
+    COSEHelper uncompressedECPointHelper;
     @Autowired
     CertificationKeyStoreUtils utils;
     @Autowired

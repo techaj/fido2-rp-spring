@@ -10,13 +10,14 @@
  * See the License for the specific language governing permissions and limitations under the License.
  */
 
-package com.mastercard.ess.fido2.service;
+package com.mastercard.ess.fido2.cryptoutils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mastercard.ess.fido2.ctap.CoseEC2Algorithm;
 import com.mastercard.ess.fido2.ctap.CoseKeyType;
 import com.mastercard.ess.fido2.ctap.CoseRSAAlgorithm;
+import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -44,9 +45,9 @@ import org.springframework.stereotype.Service;
 
 
 @Service
-public class UncompressedECPointHelper {
+public class COSEHelper {
     private static final byte UNCOMPRESSED_POINT_INDICATOR = 0x04;
-    private static final Logger LOGGER = LoggerFactory.getLogger(UncompressedECPointHelper.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(COSEHelper.class);
 
     @Autowired
     @Qualifier("base64Decoder")

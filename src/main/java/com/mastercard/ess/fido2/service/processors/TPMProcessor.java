@@ -15,6 +15,7 @@ package com.mastercard.ess.fido2.service.processors;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
+import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
 import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
@@ -23,7 +24,6 @@ import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
-import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -66,7 +66,7 @@ public class TPMProcessor implements AttestationFormatProcessor {
     @Qualifier("cborMapper")
     ObjectMapper cborMapper;
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
+    COSEHelper uncompressedECPointHelper;
     @Autowired
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;

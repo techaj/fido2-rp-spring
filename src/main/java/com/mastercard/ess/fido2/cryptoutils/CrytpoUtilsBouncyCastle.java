@@ -29,7 +29,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
-public class CrytpUtilsBouncyCastle {
+public class CrytpoUtilsBouncyCastle {
     private static final Logger LOGGER = LoggerFactory.getLogger(CryptoUtils.class);
     @Autowired
     @Qualifier("base64Decoder")

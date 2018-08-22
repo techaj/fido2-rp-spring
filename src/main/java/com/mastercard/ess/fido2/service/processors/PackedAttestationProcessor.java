@@ -14,7 +14,8 @@ package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
-import com.mastercard.ess.fido2.cryptoutils.CrytpUtilsBouncyCastle;
+import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
+import com.mastercard.ess.fido2.cryptoutils.CrytpoUtilsBouncyCastle;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.service.AuthData;
@@ -22,7 +23,6 @@ import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
-import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
 import java.security.InvalidKeyException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
@@ -53,7 +53,7 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     CertificateValidator certificateValidator;
 
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
+    COSEHelper uncompressedECPointHelper;
 
     @Autowired
     @Qualifier("base64UrlEncoder")
@@ -63,7 +63,7 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     CertificationKeyStoreUtils utils;
 
     @Autowired
-    CrytpUtilsBouncyCastle cryptoUtils;
+    CrytpoUtilsBouncyCastle cryptoUtils;
 
     @Override
     public AttestationFormat getAttestationFormat() {

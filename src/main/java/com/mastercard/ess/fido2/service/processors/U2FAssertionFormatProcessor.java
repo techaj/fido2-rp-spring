@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
@@ -21,7 +22,6 @@ import com.mastercard.ess.fido2.service.AuthData;
 import com.mastercard.ess.fido2.service.AuthenticatorDataParser;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
-import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
 import java.security.PublicKey;
 import java.util.Base64;
 import org.apache.commons.codec.binary.Hex;
@@ -37,7 +37,7 @@ public class U2FAssertionFormatProcessor implements AssertionFormatProcessor {
     private static final Logger LOGGER = LoggerFactory.getLogger(U2FAssertionFormatProcessor.class);
 
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
+    COSEHelper uncompressedECPointHelper;
 
     @Autowired
     CommonVerifiers commonVerifiers;
