@@ -165,7 +165,8 @@ class AttestationService {
 
 
         LOGGER.info("Options {} {} {}", username, displayName, documentDomain);
-        AttestationConveyancePreference attestationType = commonVerifiers.verifyAttestationConveyanceType(params);
+        AttestationConveyancePreference attestationConveyancePreference = commonVerifiers.verifyAttestationConveyanceType(params);
+
 
 
         String credentialType = params.hasNonNull("credentialType") ? params.get("credentialType").asText("public-key") : "public-key";
@@ -185,7 +186,7 @@ class AttestationService {
         credentialUserEntityNode.put("id", userId);
         credentialUserEntityNode.put("name", username);
         credentialUserEntityNode.put("displayName", displayName);
-        credentialCreationOptionsNode.put("attestation", attestationType.toString());
+        credentialCreationOptionsNode.put("attestation", attestationConveyancePreference.toString());
         ArrayNode credentialParametersArrayNode = credentialCreationOptionsNode.putArray("pubKeyCredParams");
         ObjectNode credentialParametersNode = credentialParametersArrayNode.addObject();
         if ("public-key".equals(credentialType)) {
@@ -213,7 +214,7 @@ class AttestationService {
         entity.setChallenge(challenge);
         entity.setDomain(host);
         entity.setW3cCredentialCreationOptions(credentialCreationOptionsNode.toString());
-        entity.setAttestationType(attestationType.toString());
+        entity.setAttestationConveyancePreferenceType(attestationConveyancePreference);
         registrationsRepository.save(entity);
         return credentialCreationOptionsNode;
     }

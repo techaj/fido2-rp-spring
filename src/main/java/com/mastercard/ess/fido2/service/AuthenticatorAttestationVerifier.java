@@ -61,6 +61,7 @@ public class AuthenticatorAttestationVerifier {
             JsonNode authenticatorDataNode = cborMapper.readTree(authenticatorDataBuffer);
             String fmt = commonVerifiers.verifyFmt(authenticatorDataNode.get("fmt"));
             LOGGER.info("Authenticator data {} {}", fmt, authenticatorDataNode.toString());
+            credential.setAttestationType(fmt);
             JsonNode authDataNode = authenticatorDataNode.get("authData");
             String authDataText = commonVerifiers.verifyAuthData(authDataNode);
             JsonNode attStmt = authenticatorDataNode.get("attStmt");

@@ -12,6 +12,7 @@
 
 package com.mastercard.ess.fido2.database;
 
+import com.mastercard.ess.fido2.ctap.AttestationConveyancePreference;
 import javax.persistence.Access;
 import javax.persistence.AccessType;
 import javax.persistence.Column;
@@ -73,6 +74,9 @@ public class FIDO2RegistrationEntity extends FIDO2Entity {
 
     @Column(name = "SigAlgorithmType")
     private int signatureAlgorithm;
+
+    @Column(name = "AttestationConveyancePreference")
+    private AttestationConveyancePreference attestationConveyancePreferenceType;
 
     public String getUserId() {
         return userId;
@@ -202,5 +206,13 @@ public class FIDO2RegistrationEntity extends FIDO2Entity {
 
     public void setSignatureAlgorithm(int signatureAlgorithm) {
         this.signatureAlgorithm = signatureAlgorithm;
+    }
+
+    public AttestationConveyancePreference getAttestationConveyancePreferenceType() {
+        return attestationConveyancePreferenceType;
+    }
+
+    public void setAttestationConveyancePreferenceType(AttestationConveyancePreference attestationConveyancePreferenceType) {
+        this.attestationConveyancePreferenceType = attestationConveyancePreferenceType;
     }
 }

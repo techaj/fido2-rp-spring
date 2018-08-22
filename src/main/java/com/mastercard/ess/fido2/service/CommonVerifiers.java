@@ -29,7 +29,6 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.Certificate;
-import java.security.interfaces.ECPublicKey;
 import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PSSParameterSpec;
 import java.util.Arrays;
@@ -131,7 +130,7 @@ public class CommonVerifiers {
         verifyPackedAttestationSignature(authData, clientDataHash, signature, certificate.getPublicKey(), signatureAlgorithm);
     }
 
-    public void verifyAssertionSignature(AuthData authData, byte[] clientDataHash, String signature, ECPublicKey publicKey, int signatureAlgorithm) {
+    public void verifyAssertionSignature(AuthData authData, byte[] clientDataHash, String signature, PublicKey publicKey, int signatureAlgorithm) {
         int bufferSize = 0;
         byte[] rpIdHash = authData.getRpIdHash();
         bufferSize += rpIdHash.length;
@@ -215,6 +214,7 @@ public class CommonVerifiers {
                 throw new Fido2RPRuntimeException("Unable to verify signature");
             }
         } catch (IllegalArgumentException | InvalidKeyException | SignatureException e) {
+            LOGGER.error("Can't verify the signature ", e);
             throw new Fido2RPRuntimeException("Can't verify the signature");
         }
     }
@@ -258,7 +258,7 @@ public class CommonVerifiers {
                     return signatureChecker;
                 }
                 case -257: {
-                    Signature signatureChecker = Signature.getInstance("SHA256withRSA", provider);
+                    Signature signatureChecker = Signature.getInstance("SHA256withRSA");
                     return signatureChecker;
                 }
                 case -258: {
@@ -438,7 +438,7 @@ public class CommonVerifiers {
 
     }
 
-    public void verifyPackedSurrogateAttestationSignature(byte[] authData, byte[] clientDataHash, String signature, ECPublicKey publicKey, int signatureAlgorithm) {
+    public void verifyPackedSurrogateAttestationSignature(byte[] authData, byte[] clientDataHash, String signature, PublicKey publicKey, int signatureAlgorithm) {
         int bufferSize = 0;
         bufferSize += authData.length;
         bufferSize += clientDataHash.length;

@@ -14,18 +14,23 @@ package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
-import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
+import com.mastercard.ess.fido2.cryptoutils.CrytpUtilsBouncyCastle;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.service.AuthData;
 import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
+import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
+import java.security.InvalidKeyException;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PublicKey;
+import java.security.SignatureException;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.security.interfaces.ECPublicKey;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -58,7 +63,7 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     CertificationKeyStoreUtils utils;
 
     @Autowired
-    CryptoUtils cryptoUtils;
+    CrytpUtilsBouncyCastle cryptoUtils;
 
     @Override
     public AttestationFormat getAttestationFormat() {
@@ -85,13 +90,19 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
 
             PublicKey verifiedKey = verifiedCert.getPublicKey();
             commonVerifiers.verifyPackedAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, verifiedCert, alg);
+            try {
+                verifiedCert.verify(verifiedKey);
+                throw new Fido2RPRuntimeException("Self signed certificate ");
+            } catch (CertificateException | NoSuchAlgorithmException | InvalidKeyException | NoSuchProviderException | SignatureException e) {
+
+            }
 
         } else if (attStmt.hasNonNull("ecdaaKeyId")) {
             String ecdaaKeyId = attStmt.get("ecdaaKeyId").asText();
             throw new UnsupportedOperationException("TODO");
         } else {
-            ECPublicKey ecPublicKey = uncompressedECPointHelper.getPublicKeyFromUncompressedECPoint(authData.getCOSEPublicKey());
-            commonVerifiers.verifyPackedSurrogateAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, ecPublicKey, alg);
+            PublicKey publicKey = uncompressedECPointHelper.getPublicKeyFromUncompressedECPoint(authData.getCOSEPublicKey());
+            commonVerifiers.verifyPackedSurrogateAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, publicKey, alg);
         }
         credIdAndCounters.setAttestationType(getAttestationFormat().getFmt());
         credIdAndCounters.setCredId(base64UrlEncoder.encodeToString(authData.getCredId()));

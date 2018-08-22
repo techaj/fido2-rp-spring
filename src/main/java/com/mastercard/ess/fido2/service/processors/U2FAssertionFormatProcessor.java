@@ -22,7 +22,7 @@ import com.mastercard.ess.fido2.service.AuthenticatorDataParser;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
-import java.security.interfaces.ECPublicKey;
+import java.security.PublicKey;
 import java.util.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -65,12 +65,11 @@ public class U2FAssertionFormatProcessor implements AssertionFormatProcessor {
 
         try {
             JsonNode uncompressedECPointNode = cborMapper.readTree(base64UrlDecoder.decode(registration.getUncompressedECPoint()));
-            byte[] publicKey = uncompressedECPointHelper.createUncompressedPointFromCOSEPublicKey(uncompressedECPointNode);
+            PublicKey publicKey = uncompressedECPointHelper.createUncompressedPointFromCOSEPublicKey(uncompressedECPointNode);
             int coseCurveCode = uncompressedECPointHelper.getCodeCurve(uncompressedECPointNode);
             LOGGER.info("Uncompressed ECpoint node {}", uncompressedECPointNode.toString());
-            LOGGER.info("EC Public key hex {}", Hex.encodeHexString(publicKey));
-            ECPublicKey ecPublicKey = uncompressedECPointHelper.convertUncompressedPointToECKey(publicKey, coseCurveCode);
-            commonVerifiers.verifyAssertionSignature(authData, clientDataHash, signature, ecPublicKey, registration.getSignatureAlgorithm());
+            LOGGER.info("Public key hex {}", Hex.encodeHexString(publicKey.getEncoded()));
+            commonVerifiers.verifyAssertionSignature(authData, clientDataHash, signature, publicKey, registration.getSignatureAlgorithm());
             int counter = authenticatorDataParser.parseCounter(authData.getCounters());
             commonVerifiers.verifyCounter(registration.getCounter(), counter);
             registration.setCounter(counter);
