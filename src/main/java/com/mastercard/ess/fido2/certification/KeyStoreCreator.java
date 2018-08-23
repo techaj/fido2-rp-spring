@@ -18,8 +18,10 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +51,30 @@ public class KeyStoreCreator {
                     ks.setCertificateEntry(ch.alias, ch.cert);
                 } catch (KeyStoreException e) {
                     LOGGER.warn("Can't load certificate {} {}", ch.alias, e.getMessage());
+                }
+            });
+            return ks;
+        } catch (IOException | NoSuchAlgorithmException | CertificateException | KeyStoreException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public KeyStore createKeyStore(String aaguid, List<X509Certificate> certificates) {
+        byte[] password = new byte[200];
+        new SecureRandom().nextBytes(password);
+
+        try {
+            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+            ks.load(null, base64Encoder.encodeToString(password).toCharArray());
+
+            AtomicInteger counter = new AtomicInteger(0);
+
+            certificates.stream().forEach(ch -> {
+                String alias = aaguid + "-" + counter.incrementAndGet();
+                try {
+                    ks.setCertificateEntry(alias, ch);
+                } catch (KeyStoreException e) {
+                    LOGGER.warn("Can't load certificate {} {}", alias, e.getMessage());
                 }
             });
             return ks;

@@ -14,15 +14,20 @@
 
 package com.mastercard.ess.fido2.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import java.security.Provider;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -30,6 +35,9 @@ import org.springframework.context.annotation.Primary;
 
 @Configuration
 public class GlobalBeans {
+
+    @Value("${certification.server.metadata.folder}")
+    private String certificationServerMetadataFolder;
 
     @Bean(name="cborMapper")
     public ObjectMapper getCborMapper() {
@@ -72,6 +80,11 @@ public class GlobalBeans {
     @Bean(name = "supportedAttestationFormats")
     public List<String> getSupportedAttestationFormats() {
         return Arrays.stream(AttestationFormat.values()).map(f -> f.getFmt()).collect(Collectors.toList());
+    }
+
+    @Bean(name = "authenticatorsMetadata")
+    Map<String, JsonNode> getMetadata() {
+        return Collections.synchronizedMap(new HashMap());
     }
 
 }

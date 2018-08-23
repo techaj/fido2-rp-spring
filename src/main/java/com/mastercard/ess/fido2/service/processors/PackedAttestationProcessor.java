@@ -24,7 +24,6 @@ import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.security.InvalidKeyException;
-import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PublicKey;
@@ -37,6 +36,7 @@ import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
 import javax.net.ssl.X509TrustManager;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,8 +75,8 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
         int alg = commonVerifiers.verifyAlgorithm(attStmt.get("alg"), authData.getKeyType());
         String signature = commonVerifiers.verifyBase64String(attStmt.get("sig"));
 
-        KeyStore keyStore = utils.getCertificationKeyStore();
-        X509TrustManager tm = utils.populateTrustManager(keyStore);
+
+        X509TrustManager tm = utils.populateTrustManager(authData);
 
         if (attStmt.hasNonNull("x5c")) {
             Iterator<JsonNode> i = attStmt.get("x5c").elements();
@@ -86,6 +86,11 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
             }
             List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
             credIdAndCounters.setSignatureAlgorithm(alg);
+
+            if (tm.getAcceptedIssuers().length == 0) {
+                throw new Fido2RPRuntimeException("Packed full attestation but no certificates in metadata for authenticator " + Hex.encodeHexString(authData.getAaguid()));
+            }
+
             X509Certificate verifiedCert = certificateValidator.verifyAttestationCertificates(certificates, Arrays.asList(tm.getAcceptedIssuers()));
 
             PublicKey verifiedKey = verifiedCert.getPublicKey();

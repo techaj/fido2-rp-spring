@@ -13,24 +13,25 @@
 package com.mastercard.ess.fido2.certification;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
-import java.io.ByteArrayInputStream;
-import java.io.UnsupportedEncodingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
+import com.mastercard.ess.fido2.service.AuthData;
+import java.nio.charset.Charset;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,8 +44,7 @@ public class CertificationKeyStoreUtils {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CertificationKeyStoreUtils.class);
 
-    @Autowired
-    MetadataProcessor metadataProcessor;
+
 
     @Autowired
     KeyStoreCreator keyStoreCreator;
@@ -54,76 +54,68 @@ public class CertificationKeyStoreUtils {
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;
 
+    @Autowired
+    CryptoUtils cryptoUtils;
 
-    public List<X509Certificate> getCertificates() {
-        final CertificateFactory cf;
-        try {
-            cf = CertificateFactory.getInstance("X.509");
-        } catch (CertificateException e) {
-            throw new Fido2RPRuntimeException(e.getMessage());
+    @Autowired
+    ObjectMapper mapper;
+
+    @Autowired
+    @Qualifier("authenticatorsMetadata")
+    Map<String, JsonNode> authenticatorsMetadata;
+
+    List<X509Certificate> getCertificates(JsonNode metadataNode) {
+
+        if (metadataNode == null || !metadataNode.has("attestationRootCertificates")) {
+            return Collections.emptyList();
         }
-        Map<String, JsonNode> metadata = metadataProcessor.getMetadata();
-        List<X509Certificate> certificates = metadata.entrySet().stream().map(de -> {
-            List<X509Certificate> certs = new ArrayList<>();
-            Iterator<JsonNode> iter = de.getValue().get("attestationRootCertificates").iterator();
-            while (iter.hasNext()) {
-                try {
-                    JsonNode certNode = iter.next();
-                    ByteArrayInputStream certBytes = new ByteArrayInputStream(base64Decoder.decode(certNode.asText().getBytes("UTF-8")));
-                    certs.add((X509Certificate) cf.generateCertificate(certBytes));
-                } catch (CertificateException | UnsupportedEncodingException e) {
-                    LOGGER.warn("Problem processing {} {}", de.getKey(), e.getMessage());
-                }
-            }
-            return certs;
-        }).flatMap(ch -> ch.stream()).collect(Collectors.toList());
-        return certificates;
+        ArrayNode node = (ArrayNode) metadataNode.get("attestationRootCertificates");
+        Iterator<JsonNode> iter = node.elements();
+        List<String> x509certificates = new ArrayList<>();
+        while (iter.hasNext()) {
+            JsonNode certNode = iter.next();
+            x509certificates.add(certNode.asText());
 
+        }
+        return cryptoUtils.getCertificates(x509certificates);
     }
 
-    public KeyStore getCertificationKeyStore() {
-        final CertificateFactory cf;
-        try {
-            cf = CertificateFactory.getInstance("X.509");
-        } catch (CertificateException e) {
-            throw new Fido2RPRuntimeException(e.getMessage());
-        }
+    public List<X509Certificate> getCertificates(AuthData authData) {
+        String aaguid = new String(authData.getAaguid(), Charset.forName("UTF-8"));
+        Map<String, JsonNode> aaguidMapOfMetadata = authenticatorsMetadata;
 
-        Map<String, JsonNode> metadata = metadataProcessor.getMetadata();
-        List<CertificateHolder> certHolders = metadata.entrySet().stream().map(de -> {
-            List<CertificateHolder> certs = new ArrayList<>();
-            Iterator<JsonNode> iter = de.getValue().get("attestationRootCertificates").iterator();
-            int i = 0;
-            while (iter.hasNext()) {
-                try {
-                    i++;
-                    JsonNode certNode = iter.next();
-                    ByteArrayInputStream certBytes = new ByteArrayInputStream(base64Decoder.decode(certNode.asText().getBytes("UTF-8")));
-                    certs.add(new CertificateHolder(de.getKey() + "-" + i, cf.generateCertificate(certBytes)));
-                } catch (CertificateException | UnsupportedEncodingException e) {
-                    LOGGER.warn("Problem processing {} {}", de.getKey(), e.getMessage());
-                }
-            }
-
-            return certs;
-        }).flatMap(ch -> ch.stream()).collect(Collectors.toList());
-        return keyStoreCreator.createKeyStore(certHolders);
+        JsonNode metadataForAuthenticator = aaguidMapOfMetadata.get(aaguid);
+        return getCertificates(metadataForAuthenticator);
     }
 
-    public X509TrustManager populateTrustManager(KeyStore keyStore) {
+
+    public KeyStore getCertificationKeyStore(String aaguid, List<X509Certificate> certificates) {
+        return keyStoreCreator.createKeyStore(aaguid, certificates);
+    }
+
+
+    public X509TrustManager populateTrustManager(AuthData authData) {
+        String aaguid = Hex.encodeHexString(authData.getAaguid());
+        Map<String, JsonNode> aaguidMapOfMetadata = authenticatorsMetadata;
+
+        JsonNode metadataForAuthenticator = aaguidMapOfMetadata.get(aaguid);
+        List<X509Certificate> certificates = new ArrayList<>();
+        if (metadataForAuthenticator != null) {
+            LOGGER.warn("No metadata for {}", aaguid);
+            certificates = getCertificates(metadataForAuthenticator);
+        }
+
+        KeyStore keyStore = getCertificationKeyStore(aaguid, certificates);
         TrustManagerFactory trustManagerFactory = null;
         try {
-
             trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(keyStore);
             TrustManager[] tms = trustManagerFactory.getTrustManagers();
-
             return (X509TrustManager) tms[0];
-
         } catch (NoSuchAlgorithmException | KeyStoreException e) {
             LOGGER.error("Unrecoverable problem with the platform", e);
             System.exit(1);
+            return null;
         }
-        return null;
     }
 }

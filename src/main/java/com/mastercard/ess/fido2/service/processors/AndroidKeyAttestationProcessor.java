@@ -73,8 +73,8 @@ public class AndroidKeyAttestationProcessor implements AttestationFormatProcesso
         while (i.hasNext()) {
             certificatePath.add(i.next().asText());
         }
-        List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
-        List<X509Certificate> trustAnchorCertificates = utils.getCertificates();
+        List<X509Certificate> certificates = cryptoUtils.getCertificates(certificatePath);
+        List<X509Certificate> trustAnchorCertificates = utils.getCertificates(authData);
         X509Certificate verifiedCert = (X509Certificate) certificateValidator.verifyAttestationCertificates(certificates, trustAnchorCertificates);
         ECPublicKey pubKey = (ECPublicKey) verifiedCert.getPublicKey();
 

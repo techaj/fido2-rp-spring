@@ -13,7 +13,7 @@
 package com.mastercard.ess.fido2.certification;
 
 import com.mastercard.ess.fido2.Fido2Application;
-import java.security.KeyStore;
+import com.mastercard.ess.fido2.service.AuthData;
 import javax.net.ssl.TrustManager;
 import org.junit.Assert;
 import org.junit.Before;
@@ -39,8 +39,9 @@ public class CertificationKeyStoreUtilsTest {
 
     @Test
     public void happyPathTest() {
-        KeyStore keyStore = utils.getCertificationKeyStore();
-        TrustManager tm = utils.populateTrustManager(keyStore);
+        AuthData authData = new AuthData();
+        authData.setAaguid("91dfead7-959e-4475-ad26-9b0d482be089".getBytes());
+        TrustManager tm = utils.populateTrustManager(authData);
         Assert.assertTrue(tm != null);
     }
 }

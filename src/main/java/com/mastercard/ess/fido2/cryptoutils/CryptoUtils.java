@@ -14,11 +14,9 @@ package com.mastercard.ess.fido2.cryptoutils;
 
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.io.ByteArrayInputStream;
-import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -37,19 +35,31 @@ public class CryptoUtils {
     private Base64.Decoder base64Decoder;
 
 
-    public X509Certificate getCertificate(String x5c) {
+    public X509Certificate getCertificate(String x509certificate) {
         try {
-            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x5c)));
+            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x509certificate)));
         } catch (CertificateException e) {
             throw new Fido2RPRuntimeException(e.getMessage());
         }
     }
 
-    public List<X509Certificate> getCertficates(ArrayList<String> certificatePath) {
-        return certificatePath.parallelStream().map(f -> getCertificate(f)).filter(c -> {
+    public List<X509Certificate> getCertificates(List<String> certificatePath) {
+        final CertificateFactory cf;
+        try {
+            cf = CertificateFactory.getInstance("X.509");
+        } catch (CertificateException e) {
+            throw new Fido2RPRuntimeException(e.getMessage());
+        }
+
+        return certificatePath.parallelStream().map(x509certificate -> {
+            try {
+                return (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x509certificate)));
+            } catch (CertificateException e) {
+                throw new Fido2RPRuntimeException(e.getMessage());
+            }
+        }).filter(c -> {
             try {
                 c.checkValidity();
-                PublicKey key = c.getPublicKey();
                 return true;
             } catch (CertificateException e) {
                 LOGGER.warn("Certificate not valid {}", c.getIssuerDN().getName());

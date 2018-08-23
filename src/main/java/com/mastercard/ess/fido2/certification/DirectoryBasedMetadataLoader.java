@@ -20,18 +20,24 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.stereotype.Component;
 
-@Service
-public class MetadataProcessor {
-    private static final Logger LOGGER = LoggerFactory.getLogger(MetadataProcessor.class);
+@Component
+public class DirectoryBasedMetadataLoader implements ApplicationRunner {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DirectoryBasedMetadataLoader.class);
+
+
 
     @Value("${certification.server.metadata.folder}")
     private String certificationServerMetadataFolder;
@@ -39,9 +45,13 @@ public class MetadataProcessor {
     @Autowired
     private ObjectMapper om;
 
-    public Map<String, JsonNode> getMetadata() {
+    @Autowired
+    @Qualifier("authenticatorsMetadata")
+    Map<String, JsonNode> authenticatorsMetadata;
+
+    Map<String, JsonNode> getAAGUIDMapOfMetadata() {
         Path path = FileSystems.getDefault().getPath(certificationServerMetadataFolder);
-        HashMap<String, JsonNode> nodes = new HashMap<>();
+        Map<String, JsonNode> nodes = Collections.synchronizedMap(new HashMap<>());
         DirectoryStream<Path> directoryStream = null;
         try {
             directoryStream = Files.newDirectoryStream(path);
@@ -54,7 +64,9 @@ public class MetadataProcessor {
                     JsonNode jsonNode = om.readTree(reader);
                     if (jsonNode.hasNonNull("aaguid")) {
                         String aaguid = jsonNode.get("aaguid").asText();
-                        nodes.put(aaguid, jsonNode);
+                        String convertedAaguid = aaguid.replaceAll("-", "");
+                        LOGGER.info("AAGUID conversion old {} new {}", aaguid, convertedAaguid);
+                        nodes.put(convertedAaguid, jsonNode);
                     } else {
                         LOGGER.info("No aaguid for file path {}", filePath);
                     }
@@ -75,5 +87,11 @@ public class MetadataProcessor {
             }
         }
         return nodes;
+    }
+
+    @Override
+    public void run(ApplicationArguments applicationArguments) throws Exception {
+        LOGGER.info("Populating metadata from {}", certificationServerMetadataFolder);
+        authenticatorsMetadata.putAll(getAAGUIDMapOfMetadata());
     }
 }

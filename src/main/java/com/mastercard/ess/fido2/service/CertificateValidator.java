@@ -67,8 +67,13 @@ public class CertificateValidator {
         try {
             checkForTrustedCertsInAttestation(certs, trustChainCertificates);
             Set<TrustAnchor> trustAnchors = trustChainCertificates.parallelStream().map(f -> new TrustAnchor(f, null)).collect(Collectors.toSet());
-            PKIXParameters params = new PKIXParameters(trustAnchors);
 
+            if (trustAnchors.isEmpty()) {
+                LOGGER.warn("Empty list of trust managers");
+                return (X509Certificate) certs.get(0);
+            }
+
+            PKIXParameters params = new PKIXParameters(trustAnchors);
             CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
 //            PKIXRevocationChecker rc = (PKIXRevocationChecker)cpv.getRevocationChecker();
 //            rc.setOptions(EnumSet.of(PKIXRevocationChecker.Option.SOFT_FAIL,PKIXRevocationChecker.Option.PREFER_CRLS));

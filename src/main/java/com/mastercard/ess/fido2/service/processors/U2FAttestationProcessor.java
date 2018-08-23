@@ -86,7 +86,7 @@ public class U2FAttestationProcessor implements AttestationFormatProcessor {
             while (i.hasNext()) {
                 certificatePath.add(i.next().asText());
             }
-            List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
+            List<X509Certificate> certificates = cryptoUtils.getCertificates(certificatePath);
 
 //                            certificateValidator.saveCertificate(certificate);
 

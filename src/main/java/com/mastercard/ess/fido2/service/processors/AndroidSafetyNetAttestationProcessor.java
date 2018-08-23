@@ -27,12 +27,12 @@ import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.nio.ByteBuffer;
-import java.security.KeyStore;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Base64;
 import javax.net.ssl.X509TrustManager;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,12 +79,10 @@ public class AndroidSafetyNetAttestationProcessor implements AttestationFormatPr
 
         commonVerifiers.verifyThatNonEmptyString(attStmt.get("ver"));
         String response = attStmt.get("response").asText();
+        String aaguid = Hex.encodeHexString(authData.getAaguid());
+        LOGGER.info("Android safetynet payload {} {}", aaguid, new String(base64Decoder.decode(response)));
 
-        KeyStore keyStore = utils.getCertificationKeyStore();
-        X509TrustManager tm = utils.populateTrustManager(keyStore);
-
-        LOGGER.info("Android safetynet payload {}", new String(base64Decoder.decode(response)));
-
+        X509TrustManager tm = utils.populateTrustManager(authData);
         AttestationStatement stmt = OfflineVerify.parseAndVerify(new String(base64Decoder.decode(response)), tm);
 
         if (stmt == null) {

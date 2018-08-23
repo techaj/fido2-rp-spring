@@ -102,9 +102,9 @@ public class TPMProcessor implements AttestationFormatProcessor {
                 certificatePath.add(i.next().asText());
             }
 
-            List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
-            List<X509Certificate> aikCertificates = cryptoUtils.getCertficates(aikCertificatePath);
-            List<X509Certificate> trustAnchorCertificates = utils.getCertificates();
+            List<X509Certificate> certificates = cryptoUtils.getCertificates(certificatePath);
+            List<X509Certificate> aikCertificates = cryptoUtils.getCertificates(aikCertificatePath);
+            List<X509Certificate> trustAnchorCertificates = utils.getCertificates(authData);
             X509Certificate verifiedCert = (X509Certificate) certificateValidator.verifyAttestationCertificates(certificates, trustAnchorCertificates);
             X509Certificate aikCertificate = aikCertificates.get(0);
 
