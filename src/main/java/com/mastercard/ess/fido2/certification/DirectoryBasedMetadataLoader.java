@@ -37,8 +37,6 @@ import org.springframework.stereotype.Component;
 public class DirectoryBasedMetadataLoader implements ApplicationRunner {
     private static final Logger LOGGER = LoggerFactory.getLogger(DirectoryBasedMetadataLoader.class);
 
-
-
     @Value("${certification.server.metadata.folder}")
     private String certificationServerMetadataFolder;
 

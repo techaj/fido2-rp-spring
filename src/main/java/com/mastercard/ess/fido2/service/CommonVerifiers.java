@@ -574,6 +574,18 @@ public class CommonVerifiers {
             throw new Fido2RPRuntimeException("User discouraged is present present");
         }
     }
+
+    public void verifyThatMetadataIsValid(JsonNode metadata) {
+        long count = Arrays.asList(
+                metadata.hasNonNull("aaguid"),
+                metadata.hasNonNull("assertionScheme"),
+                metadata.hasNonNull("attestationTypes"),
+                metadata.hasNonNull("description")
+        ).parallelStream().filter(f -> f == false).count();
+        if (count != 0) {
+            throw new Fido2RPRuntimeException("Invalid parameters in metadata");
+        }
+    }
 }
 
 

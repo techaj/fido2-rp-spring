@@ -79,6 +79,10 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
         X509TrustManager tm = utils.populateTrustManager(authData);
 
         if (attStmt.hasNonNull("x5c")) {
+            if (tm.getAcceptedIssuers().length == 0) {
+                throw new Fido2RPRuntimeException("Packed full attestation but no certificates in metadata for authenticator " + Hex.encodeHexString(authData.getAaguid()));
+            }
+
             Iterator<JsonNode> i = attStmt.get("x5c").elements();
             ArrayList<String> certificatePath = new ArrayList();
             while (i.hasNext()) {
@@ -86,10 +90,6 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
             }
             List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
             credIdAndCounters.setSignatureAlgorithm(alg);
-
-            if (tm.getAcceptedIssuers().length == 0) {
-                throw new Fido2RPRuntimeException("Packed full attestation but no certificates in metadata for authenticator " + Hex.encodeHexString(authData.getAaguid()));
-            }
 
             X509Certificate verifiedCert = certificateValidator.verifyAttestationCertificates(certificates, Arrays.asList(tm.getAcceptedIssuers()));
 

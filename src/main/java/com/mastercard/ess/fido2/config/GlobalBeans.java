@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
+import com.mastercard.ess.fido2.mds.TOCEntryDigester;
 import java.security.Provider;
 import java.util.Arrays;
 import java.util.Base64;
@@ -27,17 +28,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.web.client.RestTemplate;
 
 
 @Configuration
 public class GlobalBeans {
-
-    @Value("${certification.server.metadata.folder}")
-    private String certificationServerMetadataFolder;
 
     @Bean(name="cborMapper")
     public ObjectMapper getCborMapper() {
@@ -82,9 +81,25 @@ public class GlobalBeans {
         return Arrays.stream(AttestationFormat.values()).map(f -> f.getFmt()).collect(Collectors.toList());
     }
 
+    @Bean(name = "mdsRestTemplate")
+    public RestTemplate getMDSRestTemaplate() {
+        return new RestTemplateBuilder().build();
+    }
+
     @Bean(name = "authenticatorsMetadata")
     Map<String, JsonNode> getMetadata() {
         return Collections.synchronizedMap(new HashMap());
+    }
+
+    @Bean(name = "tocEntries")
+    Map<String, JsonNode> getTocEntries() {
+        return Collections.synchronizedMap(new HashMap());
+    }
+
+
+    @Bean
+    TOCEntryDigester getTocEntryDigester() {
+        return new TOCEntryDigester();
     }
 
 }

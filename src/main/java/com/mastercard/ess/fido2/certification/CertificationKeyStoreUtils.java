@@ -16,8 +16,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mastercard.ess.fido2.cryptoutils.CryptoUtils;
+import com.mastercard.ess.fido2.mds.MDSService;
 import com.mastercard.ess.fido2.service.AuthData;
-import java.nio.charset.Charset;
+import com.mastercard.ess.fido2.service.CommonVerifiers;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -41,14 +42,10 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CertificationKeyStoreUtils {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(CertificationKeyStoreUtils.class);
-
-
 
     @Autowired
     KeyStoreCreator keyStoreCreator;
-
 
     @Autowired
     @Qualifier("base64Decoder")
@@ -58,7 +55,13 @@ public class CertificationKeyStoreUtils {
     CryptoUtils cryptoUtils;
 
     @Autowired
+    CommonVerifiers commonVerifiers;
+
+    @Autowired
     ObjectMapper mapper;
+
+    @Autowired
+    MDSService mdsService;
 
     @Autowired
     @Qualifier("authenticatorsMetadata")
@@ -81,10 +84,17 @@ public class CertificationKeyStoreUtils {
     }
 
     public List<X509Certificate> getCertificates(AuthData authData) {
-        String aaguid = new String(authData.getAaguid(), Charset.forName("UTF-8"));
+        String aaguid = Hex.encodeHexString(authData.getAaguid());
         Map<String, JsonNode> aaguidMapOfMetadata = authenticatorsMetadata;
 
         JsonNode metadataForAuthenticator = aaguidMapOfMetadata.get(aaguid);
+        if (metadataForAuthenticator == null) {
+            LOGGER.info("No metadata for authenticator {}. Attempting to contact MDS", aaguid);
+            JsonNode metadata = mdsService.fetchMetadata(authData.getAaguid());
+            commonVerifiers.verifyThatMetadataIsValid(metadata);
+            authenticatorsMetadata.put(aaguid, metadata);
+            metadataForAuthenticator = metadata;
+        }
         return getCertificates(metadataForAuthenticator);
     }
 
@@ -96,16 +106,8 @@ public class CertificationKeyStoreUtils {
 
     public X509TrustManager populateTrustManager(AuthData authData) {
         String aaguid = Hex.encodeHexString(authData.getAaguid());
-        Map<String, JsonNode> aaguidMapOfMetadata = authenticatorsMetadata;
-
-        JsonNode metadataForAuthenticator = aaguidMapOfMetadata.get(aaguid);
-        List<X509Certificate> certificates = new ArrayList<>();
-        if (metadataForAuthenticator != null) {
-            LOGGER.warn("No metadata for {}", aaguid);
-            certificates = getCertificates(metadataForAuthenticator);
-        }
-
-        KeyStore keyStore = getCertificationKeyStore(aaguid, certificates);
+        List<X509Certificate> trustedCertificates = getCertificates(authData);
+        KeyStore keyStore = getCertificationKeyStore(aaguid, trustedCertificates);
         TrustManagerFactory trustManagerFactory = null;
         try {
             trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
