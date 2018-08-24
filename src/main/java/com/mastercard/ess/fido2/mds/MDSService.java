@@ -64,6 +64,7 @@ public class MDSService {
 
     public JsonNode fetchMetadata(byte[] aaguidBuffer) {
         String aaguid = deconvert(aaguidBuffer);
+
         JsonNode tocEntry = tocEntries.get(aaguid);
         if (tocEntry == null) {
             throw new Fido2RPRuntimeException("Authenticator not in TOC aaguid " + aaguid);
@@ -72,23 +73,13 @@ public class MDSService {
         URI metadataUrl;
         try {
             metadataUrl = new URI(tocEntry.get("url").asText());
+            LOGGER.info("Authenticator AAGUI {} url metadataUrl {} ", aaguid, metadataUrl);
         } catch (URISyntaxException e) {
             throw new Fido2RPRuntimeException("Invalid URI in TOC aaguid " + aaguid);
         }
 
+        verifyTocEntryStatus(aaguid, tocEntry);
         String metadataHash = commonVerifiers.verifyThatString(tocEntry.get("hash"));
-        JsonNode statusReports = tocEntry.get("statusReports");
-
-
-        Iterator<JsonNode> iter = statusReports.elements();
-        while (iter.hasNext()) {
-            JsonNode statusReport = iter.next();
-            AuthenticatorStatus authenticatorStatus = AuthenticatorStatus.valueOf(statusReport.get("status").asText());
-            String authenticatorEffectiveDate = statusReport.get("effectiveDate").asText();
-            LOGGER.info("Authenticator AAGUI {} status {} effective date {}", aaguid, authenticatorStatus, authenticatorEffectiveDate);
-            verifyStatusAcceptaable(aaguid, authenticatorStatus);
-        }
-
 
         LOGGER.info("Reaching MDS at {}", metadataUrl.toString());
 
@@ -101,7 +92,7 @@ public class MDSService {
         HttpStatus status = response.getStatusCode();
         LOGGER.info("Response from resource server {}", response.getStatusCode());
         if (status.is2xxSuccessful()) {
-            byte[] bodyBuffer = new byte[0];
+            byte[] bodyBuffer;
             try {
                 bodyBuffer = body.getBytes("UTF-8");
             } catch (UnsupportedEncodingException e) {
@@ -123,12 +114,29 @@ public class MDSService {
         }
     }
 
+    private void verifyTocEntryStatus(String aaguid, JsonNode tocEntry) {
+
+        JsonNode statusReports = tocEntry.get("statusReports");
+
+
+        Iterator<JsonNode> iter = statusReports.elements();
+        while (iter.hasNext()) {
+            JsonNode statusReport = iter.next();
+            AuthenticatorStatus authenticatorStatus = AuthenticatorStatus.valueOf(statusReport.get("status").asText());
+            String authenticatorEffectiveDate = statusReport.get("effectiveDate").asText();
+            LOGGER.info("Authenticator AAGUI {} status {} effective date {}", aaguid, authenticatorStatus, authenticatorEffectiveDate);
+            verifyStatusAcceptaable(aaguid, authenticatorStatus);
+        }
+    }
+
+    ;
+
     private String deconvert(byte[] aaguidBuffer) {
         return Hex.encodeHexString(aaguidBuffer).replaceFirst("([0-9a-fA-F]{8})([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]{4})([0-9a-fA-F]+)", "$1-$2-$3-$4-$5");
     }
 
     private void verifyStatusAcceptaable(String aaguid, AuthenticatorStatus status) {
-        final List<AuthenticatorStatus> undesiredAuthenticatorStatus = Arrays.asList(new AuthenticatorStatus[]{AuthenticatorStatus.USER_VERIFICATION_BYPASS, AuthenticatorStatus.ATTESTATION_KEY_COMPROMISE, AuthenticatorStatus.USER_KEY_REMOTE_COMPROMISE, AuthenticatorStatus.USER_KEY_PHYSICAL_COMPROMISE});
+        final List<AuthenticatorStatus> undesiredAuthenticatorStatus = Arrays.asList(new AuthenticatorStatus[]{AuthenticatorStatus.USER_VERIFICATION_BYPASS, AuthenticatorStatus.ATTESTATION_KEY_COMPROMISE, AuthenticatorStatus.USER_KEY_REMOTE_COMPROMISE, AuthenticatorStatus.USER_KEY_PHYSICAL_COMPROMISE, AuthenticatorStatus.ATTESTATION_KEY_COMPROMISE, AuthenticatorStatus.NOT_FIDO_CERTIFIED, AuthenticatorStatus.SELF_ASSERTION_SUBMITTED});
         if (undesiredAuthenticatorStatus.contains(status)) {
             throw new Fido2RPRuntimeException("Authenticator " + aaguid + "status undesirable " + status);
         }

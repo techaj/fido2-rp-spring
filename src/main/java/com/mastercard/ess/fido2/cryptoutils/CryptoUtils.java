@@ -14,6 +14,7 @@ package com.mastercard.ess.fido2.cryptoutils;
 
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -36,8 +37,13 @@ public class CryptoUtils {
 
 
     public X509Certificate getCertificate(String x509certificate) {
+        return getCertificate(new ByteArrayInputStream(base64Decoder.decode(x509certificate)));
+
+    }
+
+    public X509Certificate getCertificate(InputStream is) {
         try {
-            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x509certificate)));
+            return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(is);
         } catch (CertificateException e) {
             throw new Fido2RPRuntimeException(e.getMessage());
         }
