@@ -129,8 +129,12 @@ class AssertionService {
         LOGGER.info("assertionOptions {}", params);
         String username = params.get("username").asText();
         String userVerification = "required";
-        if (params.hasNonNull("userVerification")) {
-            userVerification = commonVerifiers.verifyUserVerification(params.get("userVerification"));
+
+        if (params.hasNonNull("authenticatorSelection")) {
+            JsonNode authenticatorSelector = params.get("authenticatorSelection");
+            if (authenticatorSelector.hasNonNull("userVerification")) {
+                userVerification = commonVerifiers.verifyUserVerification(authenticatorSelector.get("userVerification"));
+            }
         }
 
         LOGGER.info("Options {} ", username);

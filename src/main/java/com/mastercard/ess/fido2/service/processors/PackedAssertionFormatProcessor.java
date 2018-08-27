@@ -63,6 +63,7 @@ public class PackedAssertionFormatProcessor implements AssertionFormatProcessor 
         AuthData authData = authenticatorDataParser.parseAssertionData(base64AuthenticatorData);
         commonVerifiers.verifyRpIdHash(authData, registration.getDomain());
 
+        LOGGER.info("User verification option {}", authenticationEntity.getUserVerificationOption());
         if (UserVerification.valueOf(authenticationEntity.getUserVerificationOption()) == UserVerification.required) {
             commonVerifiers.verifyRequiredUserPresent(authData);
         }

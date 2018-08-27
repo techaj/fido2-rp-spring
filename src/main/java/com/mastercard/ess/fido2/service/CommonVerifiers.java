@@ -555,24 +555,43 @@ public class CommonVerifiers {
     }
 
     public void verifyRequiredUserPresent(AuthData authData) {
+        LOGGER.info("required user present {}", Hex.encodeHexString(authData.getFlags()));
         byte flags = authData.getFlags()[0];
-        if (((flags & FLAG_USER_PRESENT) == 0) && ((flags & FLAG_USER_VERIFIED) == 0)) {
+
+        if (!isUserPresent(flags) && !hasUserVerified(flags)) {
             throw new Fido2RPRuntimeException("User required not present");
         }
     }
 
+
     public void verifyPreferredUserPresent(AuthData authData) {
+
+        LOGGER.info("preferred user present {}", Hex.encodeHexString(authData.getFlags()));
         byte flags = authData.getFlags()[0];
-//        if ( ((flags & FLAG_USER_PRESENT)  == 0) && ((flags & FLAG_USER_VERIFIED) == 0)) {
-//            throw new Fido2RPRuntimeException("User required not present");
-//        }
+        if (isUserPresent(flags) && hasUserVerified(flags)) {
+            throw new Fido2RPRuntimeException("User required not present");
+        }
     }
 
     public void verifyDiscouragedUserPresent(AuthData authData) {
+        LOGGER.info("discouraged user present {}", Hex.encodeHexString(authData.getFlags()));
         byte flags = authData.getFlags()[0];
-        if (((flags & FLAG_USER_PRESENT) == 1) && ((flags & FLAG_USER_VERIFIED) == 1)) {
+        if (hasUserVerified(flags) && isUserPresent(flags)) {
             throw new Fido2RPRuntimeException("User discouraged is present present");
         }
+    }
+
+    private boolean hasUserVerified(byte flags) {
+        boolean uv = (flags & FLAG_USER_VERIFIED) != 0;
+        LOGGER.info("UV = {}", uv);
+        return uv;
+
+    }
+
+    private boolean isUserPresent(byte flags) {
+        boolean up = (flags & FLAG_USER_PRESENT) != 0;
+        LOGGER.info("UP = {}", up);
+        return up;
     }
 
     public void verifyThatMetadataIsValid(JsonNode metadata) {
