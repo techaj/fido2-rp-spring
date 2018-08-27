@@ -152,8 +152,9 @@ class AttestationService {
         } catch (MalformedURLException e) {
             host = documentDomain;
 //            throw new Fido2RPRuntimeException(e.getMessage());
-
         }
+
+        host = host.toLowerCase();
 
 
         String authenticatorSelection;

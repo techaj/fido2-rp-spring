@@ -85,7 +85,11 @@ class AssertionService {
         String keyId = commonVerifiers.verifyThatString(params.get("id"));
         commonVerifiers.verifyAssertionType(params.get("type"));
         commonVerifiers.verifyThatString(params.get("rawId"));
-        commonVerifiers.verifyThatString(params.get("response").get("userHandle"));
+        JsonNode userHandle = params.get("response").get("userHandle");
+        if (userHandle != null && params.get("response").hasNonNull("userHandle")) {
+            //this can be null for U2F authenticators
+            commonVerifiers.verifyThatString(userHandle);
+        }
 
         JsonNode clientDataJSONNode;
         try {
@@ -167,6 +171,7 @@ class AssertionService {
         } catch (MalformedURLException e) {
             host = rpDomain;
         }
+        host = host.toLowerCase();
 
         FIDO2AuthenticationEntity entity = new FIDO2AuthenticationEntity();
         entity.setUsername(username);
