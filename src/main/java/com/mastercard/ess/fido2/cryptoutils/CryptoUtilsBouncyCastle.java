@@ -29,7 +29,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
-public class CrytpoUtilsBouncyCastle {
+public class CryptoUtilsBouncyCastle {
     private static final Logger LOGGER = LoggerFactory.getLogger(CryptoUtils.class);
     @Autowired
     @Qualifier("base64Decoder")
@@ -44,7 +44,7 @@ public class CrytpoUtilsBouncyCastle {
         }
     }
 
-    public List<X509Certificate> getCertficates(ArrayList<String> certificatePath) {
+    public List<X509Certificate> getCertificates(ArrayList<String> certificatePath) {
         return certificatePath.parallelStream().map(f -> getCertificate(f)).filter(c -> {
             try {
                 c.checkValidity();

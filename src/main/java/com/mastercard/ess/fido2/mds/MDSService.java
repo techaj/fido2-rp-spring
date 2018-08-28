@@ -136,7 +136,7 @@ public class MDSService {
     }
 
     private void verifyStatusAcceptaable(String aaguid, AuthenticatorStatus status) {
-        final List<AuthenticatorStatus> undesiredAuthenticatorStatus = Arrays.asList(new AuthenticatorStatus[]{AuthenticatorStatus.USER_VERIFICATION_BYPASS, AuthenticatorStatus.ATTESTATION_KEY_COMPROMISE, AuthenticatorStatus.USER_KEY_REMOTE_COMPROMISE, AuthenticatorStatus.USER_KEY_PHYSICAL_COMPROMISE, AuthenticatorStatus.ATTESTATION_KEY_COMPROMISE, AuthenticatorStatus.NOT_FIDO_CERTIFIED, AuthenticatorStatus.SELF_ASSERTION_SUBMITTED});
+        final List<AuthenticatorStatus> undesiredAuthenticatorStatus = Arrays.asList(new AuthenticatorStatus[]{AuthenticatorStatus.USER_VERIFICATION_BYPASS, AuthenticatorStatus.ATTESTATION_KEY_COMPROMISE, AuthenticatorStatus.USER_KEY_REMOTE_COMPROMISE, AuthenticatorStatus.USER_KEY_PHYSICAL_COMPROMISE, AuthenticatorStatus.ATTESTATION_KEY_COMPROMISE});
         if (undesiredAuthenticatorStatus.contains(status)) {
             throw new Fido2RPRuntimeException("Authenticator " + aaguid + "status undesirable " + status);
         }

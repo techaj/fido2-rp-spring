@@ -15,7 +15,7 @@ package com.mastercard.ess.fido2.service.processors;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
 import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
-import com.mastercard.ess.fido2.cryptoutils.CrytpoUtilsBouncyCastle;
+import com.mastercard.ess.fido2.cryptoutils.CryptoUtilsBouncyCastle;
 import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.service.AuthData;
@@ -63,7 +63,7 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     CertificationKeyStoreUtils utils;
 
     @Autowired
-    CrytpoUtilsBouncyCastle cryptoUtils;
+    CryptoUtilsBouncyCastle cryptoUtils;
 
     @Override
     public AttestationFormat getAttestationFormat() {
@@ -88,7 +88,7 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
             while (i.hasNext()) {
                 certificatePath.add(i.next().asText());
             }
-            List<X509Certificate> certificates = cryptoUtils.getCertficates(certificatePath);
+            List<X509Certificate> certificates = cryptoUtils.getCertificates(certificatePath);
             credIdAndCounters.setSignatureAlgorithm(alg);
 
             X509Certificate verifiedCert = certificateValidator.verifyAttestationCertificates(certificates, Arrays.asList(tm.getAcceptedIssuers()));

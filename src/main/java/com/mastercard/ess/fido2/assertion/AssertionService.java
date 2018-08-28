@@ -175,7 +175,7 @@ class AssertionService {
         } catch (MalformedURLException e) {
             host = rpDomain;
         }
-        host = host.toLowerCase();
+
 
         FIDO2AuthenticationEntity entity = new FIDO2AuthenticationEntity();
         entity.setUsername(username);

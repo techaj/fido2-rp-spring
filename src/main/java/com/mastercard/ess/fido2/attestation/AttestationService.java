@@ -154,8 +154,6 @@ class AttestationService {
 //            throw new Fido2RPRuntimeException(e.getMessage());
         }
 
-        host = host.toLowerCase();
-
 
         String authenticatorSelection;
         if (params.hasNonNull("authenticatorSelection")) {

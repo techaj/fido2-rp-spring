@@ -138,12 +138,15 @@ public class MDSTOCHandler implements ApplicationRunner {
 
             try {
                 JWSVerifier verifier = resolveVerifier(algorithm, mdsTocRootFileLocation, certificateChain);
-                jwsObject.verify(verifier);
+                if (!jwsObject.verify(verifier)) {
+                    LOGGER.warn("Unable to verify JWS object using algorithm {} for file {}", algorithm, path);
+                    return Collections.emptyMap();
+                }
             } catch (JOSEException e) {
-                LOGGER.warn("Unable to verify JWS object using algorithm {} for file {}", algorithm, path);
+                LOGGER.warn("Unable to verify JWS object using algorithm {} for file {} {} ", algorithm, path, e.getMessage());
                 return Collections.emptyMap();
             } catch (Fido2RPRuntimeException ex) {
-                LOGGER.warn("Unable to verify JWS object using algorithm {} for file {}", algorithm, path);
+                LOGGER.warn("Unable to verify JWS object using algorithm {} for file {} {}", algorithm, path, ex.getMessage());
                 return Collections.emptyMap();
             }
             tocEntryDigester.setDigester(resolveDigester(algorithm));
@@ -157,6 +160,7 @@ public class MDSTOCHandler implements ApplicationRunner {
             Map<String, JsonNode> tocEntries = new HashMap<>();
             while (iter.hasNext()) {
                 JsonNode tocEntry = iter.next();
+                LOGGER.info("{} {}", path, tocEntry.get("aaguid").asText());
                 tocEntries.put(tocEntry.get("aaguid").asText(), tocEntry);
             }
             return tocEntries;

@@ -12,7 +12,7 @@
 
 package com.mastercard.ess.fido2.mds;
 
-// https://fidoalliance.org/specs/fido-v2.0-rd-20170927/fido-metadata-service-v2.0-rd-20170927.html#dictionary-statusreport-members
+// https://fidoalliance.org/specs/fido-v2.0-rd-20180702/fido-metadata-service-v2.0-rd-20180702.html
 enum AuthenticatorStatus {
     NOT_FIDO_CERTIFIED,
     FIDO_CERTIFIED,
@@ -24,8 +24,9 @@ enum AuthenticatorStatus {
     REVOKED,
     SELF_ASSERTION_SUBMITTED,
     FIDO_CERTIFIED_L1,
+    FIDO_CERTIFIED_L1plus,
     FIDO_CERTIFIED_L2,
+    FIDO_CERTIFIED_L2plus,
     FIDO_CERTIFIED_L3,
-    FIDO_CERTIFIED_L4,
-    FIDO_CERTIFIED_L5;
+    FIDO_CERTIFIED_L3plus
 }
