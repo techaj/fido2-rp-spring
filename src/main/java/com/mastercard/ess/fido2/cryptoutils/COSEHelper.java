@@ -10,10 +10,14 @@
  * See the License for the specific language governing permissions and limitations under the License.
  */
 
-package com.mastercard.ess.fido2.service;
+package com.mastercard.ess.fido2.cryptoutils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.ctap.CoseEC2Algorithm;
+import com.mastercard.ess.fido2.ctap.CoseKeyType;
+import com.mastercard.ess.fido2.ctap.CoseRSAAlgorithm;
+import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -21,6 +25,7 @@ import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
+import java.security.PublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
@@ -28,6 +33,7 @@ import java.security.spec.ECPoint;
 import java.security.spec.ECPublicKeySpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.InvalidParameterSpecException;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 import org.apache.commons.codec.binary.Hex;
@@ -37,14 +43,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+
 @Service
-public class UncompressedECPointHelper {
+public class COSEHelper {
     private static final byte UNCOMPRESSED_POINT_INDICATOR = 0x04;
-    private static final Logger LOGGER = LoggerFactory.getLogger(UncompressedECPointHelper.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(COSEHelper.class);
 
     @Autowired
     @Qualifier("base64Decoder")
     private Base64.Decoder base64Decoder;
+
+    @Autowired
+    @Qualifier("base64UrlDecoder")
+    private Base64.Decoder base64UrlDecoder;
 
     @Autowired
     @Qualifier("cborMapper")
@@ -66,16 +77,69 @@ public class UncompressedECPointHelper {
         return uncompressedECPointNode.get("-1").asInt();
     }
 
-    public byte[] createUncompressedPointFromCOSEPublicKey(JsonNode uncompressedECPointNode) {
-        byte[] x = base64Decoder.decode(uncompressedECPointNode.get("-2").asText());
-        byte[] y = base64Decoder.decode(uncompressedECPointNode.get("-3").asText());
-        return ByteBuffer.allocate(1 + x.length + y.length).put(UNCOMPRESSED_POINT_INDICATOR).put(x).put(y).array();
+    public PublicKey createUncompressedPointFromCOSEPublicKey(JsonNode uncompressedECPointNode) {
+        int keyToUse = uncompressedECPointNode.get("1").asInt();
+        int algorithmToUse = uncompressedECPointNode.get("3").asInt();
+        CoseKeyType keyType = CoseKeyType.fromNumericValue(keyToUse);
+
+        switch (keyType) {
+            case RSA: {
+                CoseRSAAlgorithm coseRSAAlgorithm = CoseRSAAlgorithm.fromNumericValue(algorithmToUse);
+                switch (coseRSAAlgorithm) {
+                    case RS65535:
+                    case RS256: {
+                        byte[] rsaKey_n = base64Decoder.decode(uncompressedECPointNode.get("-1").asText());
+                        byte[] rsaKey_e = base64Decoder.decode(uncompressedECPointNode.get("-2").asText());
+                        return convertUncompressedPointToRSAKey(rsaKey_n, rsaKey_e);
+                    }
+                    default: {
+                        throw new Fido2RPRuntimeException("Don't know what to do with this key" + keyType);
+                    }
+                }
+            }
+            case EC2: {
+                CoseEC2Algorithm coseEC2Algorithm = CoseEC2Algorithm.fromNumericValue(algorithmToUse);
+                switch (coseEC2Algorithm) {
+                    case ES256: {
+                        int curve = uncompressedECPointNode.get("-1").asInt();
+                        byte[] x = base64Decoder.decode(uncompressedECPointNode.get("-2").asText());
+                        byte[] y = base64Decoder.decode(uncompressedECPointNode.get("-3").asText());
+                        byte[] buffer = ByteBuffer.allocate(1 + x.length + y.length).put(UNCOMPRESSED_POINT_INDICATOR).put(x).put(y).array();
+                        return convertUncompressedPointToECKey(buffer, curve);
+                    }
+                    default: {
+                        throw new Fido2RPRuntimeException("Don't know what to do with this key" + keyType + " and algorithm " + coseEC2Algorithm);
+                    }
+                }
+            }
+            case OKP: {
+                throw new Fido2RPRuntimeException("Don't know what to do with this key" + keyType);
+            }
+            default:
+                throw new Fido2RPRuntimeException("Don't know what to do with this key" + keyType);
+        }
+
+    }
+
+    private PublicKey convertUncompressedPointToRSAKey(byte[] rsaKey_n, byte[] rsaKey_e) {
+        AlgorithmParameters parameters = null;
+        try {
+
+            BigInteger n = new BigInteger(1, rsaKey_n);
+            BigInteger e = new BigInteger(1, rsaKey_e);
+            RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(n, e);
+            final KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            return keyFactory.generatePublic(publicKeySpec);
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            LOGGER.error("Problem here ", e);
+            throw new Fido2RPRuntimeException(e.getMessage());
+        }
     }
 
     public ECPublicKey convertUncompressedPointToECKey(final byte[] uncompressedPoint, int curve) {
         AlgorithmParameters parameters = null;
         try {
-            parameters = AlgorithmParameters.getInstance("EC", provider);
+            parameters = AlgorithmParameters.getInstance("EC");
 
             parameters.init(new ECGenParameterSpec(convertCoseCurveToSunCurveName(curve)));
             ECParameterSpec params = parameters.getParameterSpec(ECParameterSpec.class);
@@ -101,24 +165,23 @@ public class UncompressedECPointHelper {
                     uncompressedPoint, offset, offset + keySizeBytes));
             final ECPoint w = new ECPoint(x, y);
             final ECPublicKeySpec ecPublicKeySpec = new ECPublicKeySpec(w, params);
-            final KeyFactory keyFactory = KeyFactory.getInstance("EC", provider);
+            final KeyFactory keyFactory = KeyFactory.getInstance("EC");
             return (ECPublicKey) keyFactory.generatePublic(ecPublicKeySpec);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | InvalidParameterSpecException e) {
             throw new Fido2RPRuntimeException(e.getMessage());
         }
     }
 
-    public ECPublicKey getPublicKeyFromUncompressedECPoint(byte[] uncompressedECPointCOSEPubKey) {
+    public PublicKey getPublicKeyFromUncompressedECPoint(byte[] uncompressedECPointCOSEPubKey) {
         JsonNode uncompressedECPointNode = null;
         try {
             uncompressedECPointNode = cborMapper.readTree(uncompressedECPointCOSEPubKey);
         } catch (IOException e) {
             throw new Fido2RPRuntimeException("Unable to parse the structure ");
         }
-        byte[] publicKey = createUncompressedPointFromCOSEPublicKey(uncompressedECPointNode);
-        int coseCurveCode = getCodeCurve(uncompressedECPointNode);
         LOGGER.debug("Uncompressed ECpoint node {}", uncompressedECPointNode.toString());
-        LOGGER.debug("EC Public key hex {}", Hex.encodeHexString(publicKey));
-        return convertUncompressedPointToECKey(publicKey, coseCurveCode);
+        PublicKey publicKey = createUncompressedPointFromCOSEPublicKey(uncompressedECPointNode);
+        LOGGER.debug("EC Public key hex {}", Hex.encodeHexString(publicKey.getEncoded()));
+        return publicKey;
     }
 }

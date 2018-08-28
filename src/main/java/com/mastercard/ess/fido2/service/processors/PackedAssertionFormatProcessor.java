@@ -14,15 +14,16 @@ package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
+import com.mastercard.ess.fido2.ctap.UserVerification;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import com.mastercard.ess.fido2.service.AttestationFormat;
 import com.mastercard.ess.fido2.service.AuthData;
 import com.mastercard.ess.fido2.service.AuthenticatorDataParser;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
-import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
-import java.security.interfaces.ECPublicKey;
+import java.security.PublicKey;
 import java.util.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -37,7 +38,7 @@ public class PackedAssertionFormatProcessor implements AssertionFormatProcessor 
     private static final Logger LOGGER = LoggerFactory.getLogger(PackedAssertionFormatProcessor.class);
 
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
+    COSEHelper uncompressedECPointHelper;
 
     @Autowired
     CommonVerifiers commonVerifiers;
@@ -60,18 +61,30 @@ public class PackedAssertionFormatProcessor implements AssertionFormatProcessor 
 
     public void process(String base64AuthenticatorData, String signature, String clientDataJson, FIDO2RegistrationEntity registration, FIDO2AuthenticationEntity authenticationEntity) {
         AuthData authData = authenticatorDataParser.parseAssertionData(base64AuthenticatorData);
-        commonVerifiers.verifyUserPresent(authData);
+        commonVerifiers.verifyRpIdHash(authData, registration.getDomain());
+
+        LOGGER.info("User verification option {}", authenticationEntity.getUserVerificationOption());
+        if (UserVerification.valueOf(authenticationEntity.getUserVerificationOption()) == UserVerification.required) {
+            commonVerifiers.verifyRequiredUserPresent(authData);
+        }
+        if (UserVerification.valueOf(authenticationEntity.getUserVerificationOption()) == UserVerification.preferred) {
+            commonVerifiers.verifyPreferredUserPresent(authData);
+        }
+        if (UserVerification.valueOf(authenticationEntity.getUserVerificationOption()) == UserVerification.discouraged) {
+            commonVerifiers.verifyDiscouragedUserPresent(authData);
+        }
+
         byte[] clientDataHash = DigestUtils.getSha256Digest().digest(base64UrlDecoder.decode(clientDataJson));
 
         try {
 
             JsonNode uncompressedECPointNode = cborMapper.readTree(base64UrlDecoder.decode(registration.getUncompressedECPoint()));
-            byte[] publicKey = uncompressedECPointHelper.createUncompressedPointFromCOSEPublicKey(uncompressedECPointNode);
-            int coseCurveCode = uncompressedECPointHelper.getCodeCurve(uncompressedECPointNode);
+            PublicKey publicKey = uncompressedECPointHelper.createUncompressedPointFromCOSEPublicKey(uncompressedECPointNode);
+
             LOGGER.info("Uncompressed ECpoint node {}", uncompressedECPointNode.toString());
-            LOGGER.info("EC Public key hex {}", Hex.encodeHexString(publicKey));
-            ECPublicKey ecPublicKey = uncompressedECPointHelper.convertUncompressedPointToECKey(publicKey, coseCurveCode);
-            commonVerifiers.verifyAssertionSignature(authData, clientDataHash, signature, ecPublicKey, registration.getSignatureAlgorithm());
+            LOGGER.info("EC Public key hex {}", Hex.encodeHexString(publicKey.getEncoded()));
+
+            commonVerifiers.verifyAssertionSignature(authData, clientDataHash, signature, publicKey, registration.getSignatureAlgorithm());
             int counter = authenticatorDataParser.parseCounter(authData.getCounters());
             commonVerifiers.verifyCounter(registration.getCounter(), counter);
             registration.setCounter(counter);

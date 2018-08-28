@@ -15,54 +15,86 @@ package com.mastercard.ess.fido2.service;
 import java.io.File;
 import java.io.IOException;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PublicKey;
+import java.security.SignatureException;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
-import java.security.cert.CertPathValidatorResult;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.PKIXParameters;
+import java.security.cert.PKIXRevocationChecker;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CertificateValidator {
     private static final Logger LOGGER = LoggerFactory.getLogger(CertificateValidator.class);
 
+    @Autowired
+    @Qualifier("base64Encoder")
+    private Base64.Encoder base64Encoder;
+
+
     void saveCertificate(X509Certificate certificate) throws IOException {
         FileUtils.writeStringToFile(new File("c:/tmp/cert-" + certificate.getSerialNumber() + ".crt"), certificate.toString());
     }
 
 
-    public Certificate verifyCert(List<X509Certificate> certs, List<X509Certificate> trustChainCertificates) {
-        try {
+    void checkForTrustedCertsInAttestation(List<X509Certificate> attestationCerts, List<X509Certificate> trustChainCertificates) {
+        final List<String> trustedSignatures = trustChainCertificates.stream().map(cert -> base64Encoder.encodeToString(cert.getSignature())).collect(Collectors.toList());
+        List<String> duplicateSignatures = attestationCerts.stream().map(cert -> base64Encoder.encodeToString(cert.getSignature())).filter(sig -> trustedSignatures.contains(sig)).collect(Collectors.toList());
+        if (!duplicateSignatures.isEmpty()) {
+            throw new Fido2RPRuntimeException("Root certificate in the attestation ");
+        }
+    }
 
-            if (isSelfSigned(certs.get(0))) {
-                return null;
+    public X509Certificate verifyAttestationCertificates(List<X509Certificate> certs, List<X509Certificate> trustChainCertificates) {
+        try {
+            checkForTrustedCertsInAttestation(certs, trustChainCertificates);
+            Set<TrustAnchor> trustAnchors = trustChainCertificates.parallelStream().map(f -> new TrustAnchor(f, null)).collect(Collectors.toSet());
+
+            if (trustAnchors.isEmpty()) {
+                LOGGER.warn("Empty list of trust managers");
+                return (X509Certificate) certs.get(0);
             }
 
-            Set<TrustAnchor> trustAnchors = trustChainCertificates.parallelStream().map(f -> new TrustAnchor(f, null)).collect(Collectors.toSet());
             PKIXParameters params = new PKIXParameters(trustAnchors);
-            params.setRevocationEnabled(false);
             CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
+
+            PKIXRevocationChecker rc = (PKIXRevocationChecker) cpv.getRevocationChecker();
+            rc.setOptions(EnumSet.of(PKIXRevocationChecker.Option.SOFT_FAIL, PKIXRevocationChecker.Option.PREFER_CRLS));
+            params.addCertPathChecker(rc);
             CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
             CertPath certPath = certFactory.generateCertPath(certs);
-            try {
-                CertPathValidatorResult result = cpv.validate(certPath, params);
-                return certPath.getCertificates().get(0);
 
-            } catch (CertPathValidatorException ex) {
-                LOGGER.warn("Cert not validated against the root {}", ex.getMessage());
-                throw new Fido2RPRuntimeException("Problem with certificate");
+            X509Certificate cert = verifyPath(cpv, certPath, params);
+            if (cert != null) {
+                return cert;
+            } else {
+                params = new PKIXParameters(trustAnchors);
+                cpv = CertPathValidator.getInstance("PKIX");
+                rc = (PKIXRevocationChecker) cpv.getRevocationChecker();
+                rc.setOptions(Collections.emptySet());
+                params.setRevocationEnabled(false);
+                params.addCertPathChecker(null);
+
+                return verifyPath(cpv, certPath, params);
             }
 
         } catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | CertificateException e) {
@@ -71,7 +103,46 @@ public class CertificateValidator {
         }
     }
 
-    private boolean isSelfSigned(X509Certificate cert) {
-        return cert.getIssuerDN().equals(cert.getSubjectDN());
+    private X509Certificate verifyPath(CertPathValidator cpv, CertPath certPath, PKIXParameters params) {
+        try {
+            cpv.validate(certPath, params);
+            return (X509Certificate) certPath.getCertificates().get(0);
+        } catch (CertPathValidatorException ex) {
+            if (ex.getReason() == CertPathValidatorException.BasicReason.UNDETERMINED_REVOCATION_STATUS) {
+                LOGGER.info("Cert not validated against the root {}", ex.getMessage());
+                return null;
+            } else {
+                LOGGER.warn("Cert not validated against the root {}", ex.getMessage());
+                throw new Fido2RPRuntimeException("Problem with certificate " + ex.getMessage());
+            }
+        } catch (InvalidAlgorithmParameterException e) {
+            LOGGER.warn("Cert verification problem {}", e.getMessage(), e);
+            throw new Fido2RPRuntimeException("Problem with certificate");
+        }
+    }
+
+
+
+
+
+
+
+
+    public boolean isSelfSigned(X509Certificate cert) {
+        return isSelfSigned(cert, cert.getPublicKey());
+
+    }
+
+
+    public boolean isSelfSigned(X509Certificate cert, PublicKey key) {
+        try {
+            // Try to verify certificate signature with its own public key
+            cert.verify(key);
+            return cert.getIssuerDN().equals(cert.getSubjectDN());
+        } catch (SignatureException | CertificateException | InvalidKeyException | NoSuchAlgorithmException | NoSuchProviderException e) {
+            LOGGER.warn("Probably not self signed cert. Cert verification problem {}", e.getMessage());
+            return false;
+        }
     }
 }
+

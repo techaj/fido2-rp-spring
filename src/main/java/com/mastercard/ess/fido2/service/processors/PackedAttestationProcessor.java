@@ -13,27 +13,30 @@
 package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mastercard.ess.fido2.certification.CertificationKeyStoreUtils;
+import com.mastercard.ess.fido2.cryptoutils.COSEHelper;
+import com.mastercard.ess.fido2.cryptoutils.CryptoUtilsBouncyCastle;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import com.mastercard.ess.fido2.service.AttestationFormat;
 import com.mastercard.ess.fido2.service.AuthData;
-import com.mastercard.ess.fido2.service.CertificateSelector;
 import com.mastercard.ess.fido2.service.CertificateValidator;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
 import com.mastercard.ess.fido2.service.Fido2RPRuntimeException;
-import com.mastercard.ess.fido2.service.UncompressedECPointHelper;
-import java.io.ByteArrayInputStream;
-import java.security.cert.Certificate;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.PublicKey;
+import java.security.SignatureException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.interfaces.ECPublicKey;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
+import javax.net.ssl.X509TrustManager;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,25 +50,20 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     CommonVerifiers commonVerifiers;
 
     @Autowired
-    @Qualifier("cborMapper")
-    ObjectMapper cborMapper;
-    @Autowired
-    AttestationProcessorFactory attestationProcessorFactory;
-    @Autowired
-    CertificateSelector certificateSelector;
-    @Autowired
     CertificateValidator certificateValidator;
+
     @Autowired
-    UncompressedECPointHelper uncompressedECPointHelper;
-    @Autowired
-    @Qualifier("base64UrlDecoder")
-    private Base64.Decoder base64UrlDecoder;
+    COSEHelper uncompressedECPointHelper;
+
     @Autowired
     @Qualifier("base64UrlEncoder")
     private Base64.Encoder base64UrlEncoder;
+
     @Autowired
-    @Qualifier("base64Decoder")
-    private Base64.Decoder base64Decoder;
+    CertificationKeyStoreUtils utils;
+
+    @Autowired
+    CryptoUtilsBouncyCastle cryptoUtils;
 
     @Override
     public AttestationFormat getAttestationFormat() {
@@ -73,38 +71,43 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
     }
 
     @Override
-    public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity credential, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
+    public void process(JsonNode attStmt, AuthData authData, FIDO2RegistrationEntity registration, byte[] clientDataHash, CredAndCounterData credIdAndCounters) {
         int alg = commonVerifiers.verifyAlgorithm(attStmt.get("alg"), authData.getKeyType());
         String signature = commonVerifiers.verifyBase64String(attStmt.get("sig"));
 
 
+        X509TrustManager tm = utils.populateTrustManager(authData);
+
         if (attStmt.hasNonNull("x5c")) {
+            if (tm.getAcceptedIssuers().length == 0) {
+                throw new Fido2RPRuntimeException("Packed full attestation but no certificates in metadata for authenticator " + Hex.encodeHexString(authData.getAaguid()));
+            }
+
             Iterator<JsonNode> i = attStmt.get("x5c").elements();
             ArrayList<String> certificatePath = new ArrayList();
             while (i.hasNext()) {
                 certificatePath.add(i.next().asText());
             }
-            List<X509Certificate> certificates = certificatePath.parallelStream().map(f -> getCertificate(f)).filter(c -> {
-                try {
-                    c.checkValidity();
-                    return true;
-                } catch (CertificateException e) {
-                    LOGGER.warn("Certificate not valid {}" + c.getIssuerDN().getName());
-                    throw new Fido2RPRuntimeException("Certificate not valid ");
-                }
-            }).collect(Collectors.toList());
-//                            certificateValidator.saveCertificate(certificate);
-
+            List<X509Certificate> certificates = cryptoUtils.getCertificates(certificatePath);
             credIdAndCounters.setSignatureAlgorithm(alg);
-            List<X509Certificate> trustAnchorCertificates = certificateSelector.selectRootCertificate(certificates.get(0));
-            Certificate verifiedCert = certificateValidator.verifyCert(certificates, trustAnchorCertificates);
+
+            X509Certificate verifiedCert = certificateValidator.verifyAttestationCertificates(certificates, Arrays.asList(tm.getAcceptedIssuers()));
+
+            PublicKey verifiedKey = verifiedCert.getPublicKey();
             commonVerifiers.verifyPackedAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, verifiedCert, alg);
+            try {
+                verifiedCert.verify(verifiedKey);
+                throw new Fido2RPRuntimeException("Self signed certificate ");
+            } catch (CertificateException | NoSuchAlgorithmException | InvalidKeyException | NoSuchProviderException | SignatureException e) {
+
+            }
+
         } else if (attStmt.hasNonNull("ecdaaKeyId")) {
             String ecdaaKeyId = attStmt.get("ecdaaKeyId").asText();
             throw new UnsupportedOperationException("TODO");
         } else {
-            ECPublicKey ecPublicKey = uncompressedECPointHelper.getPublicKeyFromUncompressedECPoint(authData.getCOSEPublicKey());
-            commonVerifiers.verifyPackedSurrogateAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, ecPublicKey, alg);
+            PublicKey publicKey = uncompressedECPointHelper.getPublicKeyFromUncompressedECPoint(authData.getCOSEPublicKey());
+            commonVerifiers.verifyPackedSurrogateAttestationSignature(authData.getAuthDataDecoded(), clientDataHash, signature, publicKey, alg);
         }
         credIdAndCounters.setAttestationType(getAttestationFormat().getFmt());
         credIdAndCounters.setCredId(base64UrlEncoder.encodeToString(authData.getCredId()));
@@ -112,11 +115,5 @@ public class PackedAttestationProcessor implements AttestationFormatProcessor {
 
     }
 
-    X509Certificate getCertificate(String x5c) {
-        try {
-            return (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new ByteArrayInputStream(base64Decoder.decode(x5c)));
-        } catch (CertificateException e) {
-            throw new Fido2RPRuntimeException(e.getMessage());
-        }
-    }
+
 }

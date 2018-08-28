@@ -142,6 +142,7 @@ function processRegisterForm(e) {
     clearSuccess();
     displayLoading("Contacting token... please perform your verification gesture (e.g., touch it, or plug it in)\n\n");
 
+//    let rpid = 'gh-50v0y52.corp.mastercard.org';
     let rpid = document.domain;
     let formBody = {"username": $("#username").val(),"displayName":$("#alias").val()};
     fetch('/attestation/options', {

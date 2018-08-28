@@ -21,6 +21,7 @@ import com.mastercard.ess.fido2.database.FIDO2AuthenticationRepository;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationRepository;
 import com.mastercard.ess.fido2.service.AuthenticatorAssertionVerifier;
+import com.mastercard.ess.fido2.service.ChallengeGenerator;
 import com.mastercard.ess.fido2.service.ChallengeVerifier;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.DomainVerifier;
@@ -29,7 +30,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
@@ -54,6 +54,8 @@ class AssertionService {
     FIDO2AuthenticationRepository authenticationsRepository;
     @Autowired
     AuthenticatorAssertionVerifier authenticatorAuthorizationVerifier;
+    @Autowired
+    ChallengeGenerator challengeGenerator;
     @Autowired
     private ObjectMapper om;
     @Autowired
@@ -81,7 +83,13 @@ class AssertionService {
 
         commonVerifiers.verifyBasicPayload(params);
         String keyId = commonVerifiers.verifyThatString(params.get("id"));
+        commonVerifiers.verifyAssertionType(params.get("type"));
         commonVerifiers.verifyThatString(params.get("rawId"));
+        JsonNode userHandle = params.get("response").get("userHandle");
+        if (userHandle != null && params.get("response").hasNonNull("userHandle")) {
+            //this can be null for U2F authenticators
+            commonVerifiers.verifyThatString(userHandle);
+        }
 
         JsonNode clientDataJSONNode;
         try {
@@ -121,8 +129,12 @@ class AssertionService {
         LOGGER.info("assertionOptions {}", params);
         String username = params.get("username").asText();
         String userVerification = "required";
-        if (params.hasNonNull("userVerification")) {
-            userVerification = commonVerifiers.verifyUserVerification(params.get("userVerification"));
+
+        if (params.hasNonNull("authenticatorSelection")) {
+            JsonNode authenticatorSelector = params.get("authenticatorSelection");
+            if (authenticatorSelector.hasNonNull("userVerification")) {
+                userVerification = commonVerifiers.verifyUserVerification(authenticatorSelector.get("userVerification"));
+            }
         }
 
         LOGGER.info("Options {} ", username);
@@ -130,10 +142,8 @@ class AssertionService {
         ObjectNode assertionOptionsResponseNode = om.createObjectNode();
         List<FIDO2RegistrationEntity> registrations = registrationsRepository.findAllByUsername(username);
 
-        byte buffer[] = new byte[32];
-        new SecureRandom().nextBytes(buffer);
 
-        String challenge = base64UrlEncoder.encodeToString(buffer);
+        String challenge = challengeGenerator.getChallenge();
         assertionOptionsResponseNode.put("challenge", challenge);
 
         ObjectNode credentialUserEntityNode = assertionOptionsResponseNode.putObject("user");
@@ -163,14 +173,16 @@ class AssertionService {
         try {
             host = new URL(rpDomain).getHost();
         } catch (MalformedURLException e) {
-            throw new Fido2RPRuntimeException(e.getMessage());
+            host = rpDomain;
         }
+
 
         FIDO2AuthenticationEntity entity = new FIDO2AuthenticationEntity();
         entity.setUsername(username);
         entity.setChallenge(challenge);
         entity.setDomain(host);
         entity.setW3cCredentialRequestOptions(assertionOptionsResponseNode.toString());
+        entity.setUserVerificationOption(userVerification);
 
         authenticationsRepository.save(entity);
         assertionOptionsResponseNode.put("status", "ok");

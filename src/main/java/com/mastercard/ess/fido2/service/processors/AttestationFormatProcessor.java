@@ -13,8 +13,8 @@
 package com.mastercard.ess.fido2.service.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
-import com.mastercard.ess.fido2.service.AttestationFormat;
 import com.mastercard.ess.fido2.service.AuthData;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
 

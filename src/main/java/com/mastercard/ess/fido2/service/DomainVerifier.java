@@ -15,10 +15,14 @@ package com.mastercard.ess.fido2.service;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class DomainVerifier {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DomainVerifier.class);
 
     public boolean verifyDomain(String domain, String clientDataOrigin) {
         // a hack, there is a problem when we are sending https://blah as rp.id
@@ -26,13 +30,18 @@ public class DomainVerifier {
         // so instead we are using
         // let rpid = document.domain;
         // but then clientDataOrigin is https://
+
+        LOGGER.info("Domains comparison {} {}", domain, clientDataOrigin);
         try {
             if (!domain.equals(new URL(clientDataOrigin).getHost())) {
                 throw new Fido2RPRuntimeException("Domains don't match");
             }
             return true;
         } catch (MalformedURLException e) {
-            throw new Fido2RPRuntimeException("Not valid domain");
+            if (!domain.equals(clientDataOrigin)) {
+                throw new Fido2RPRuntimeException("Domains don't match");
+            }
+            return true;
         }
     }
 }

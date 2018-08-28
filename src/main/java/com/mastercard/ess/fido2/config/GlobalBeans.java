@@ -14,18 +14,25 @@
 
 package com.mastercard.ess.fido2.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
-import com.mastercard.ess.fido2.service.AttestationFormat;
+import com.mastercard.ess.fido2.ctap.AttestationFormat;
+import com.mastercard.ess.fido2.mds.TOCEntryDigester;
 import java.security.Provider;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.web.client.RestTemplate;
 
 
 @Configuration
@@ -39,6 +46,11 @@ public class GlobalBeans {
     @Bean(name="base64UrlEncoder")
     public Base64.Encoder getBase64UrlEncoder() {
         return Base64.getUrlEncoder().withoutPadding();
+    }
+
+    @Bean(name = "base64Encoder")
+    public Base64.Encoder getBase64Encoder() {
+        return Base64.getEncoder().withoutPadding();
     }
 
     @Bean(name="base64UrlDecoder")
@@ -67,6 +79,27 @@ public class GlobalBeans {
     @Bean(name = "supportedAttestationFormats")
     public List<String> getSupportedAttestationFormats() {
         return Arrays.stream(AttestationFormat.values()).map(f -> f.getFmt()).collect(Collectors.toList());
+    }
+
+    @Bean(name = "mdsRestTemplate")
+    public RestTemplate getMDSRestTemaplate() {
+        return new RestTemplateBuilder().build();
+    }
+
+    @Bean(name = "authenticatorsMetadata")
+    Map<String, JsonNode> getMetadata() {
+        return Collections.synchronizedMap(new HashMap());
+    }
+
+    @Bean(name = "tocEntries")
+    Map<String, JsonNode> getTocEntries() {
+        return Collections.synchronizedMap(new HashMap());
+    }
+
+
+    @Bean
+    TOCEntryDigester getTocEntryDigester() {
+        return new TOCEntryDigester();
     }
 
 }

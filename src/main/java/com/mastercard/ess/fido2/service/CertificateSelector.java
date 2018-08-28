@@ -15,6 +15,7 @@ package com.mastercard.ess.fido2.service;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.security.Provider;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -32,20 +34,23 @@ public class CertificateSelector {
     @Value("${certs.location}")
     private String certsLocation;
 
+    @Autowired
+    Provider provider;
+
     public List<X509Certificate> selectRootCertificate(X509Certificate certificate) {
         ArrayList<X509Certificate> certs = new ArrayList<>();
         try {
             switch(certificate.getIssuerDN().getName()){
                 case "CN=Yubico U2F Root CA Serial 457200631":
-                    certs.add((X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new FileInputStream(new File(certsLocation + "yubico-u2f-ca-certs.crt"))));
+                    certs.add((X509Certificate) CertificateFactory.getInstance("X509", provider).generateCertificate(new FileInputStream(new File(certsLocation + "yubico-u2f-ca-certs.crt"))));
                     break;
 
                 case "L=Wakefield, ST=MY, C=US, OU=CWG, O=FIDO Alliance, EMAILADDRESS=conformance-tools@fidoalliance.org, CN=FIDO2 BATCH KEY prime256v1":
-                    certs.add((X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new FileInputStream(new File(certsLocation + "fido-conf-tool-ca-batch-cert.crt"))));
+                    certs.add((X509Certificate) CertificateFactory.getInstance("X509", provider).generateCertificate(new FileInputStream(new File(certsLocation + "fido-conf-tool-ca-batch-cert.crt"))));
                 case "L=Wakefield, ST=MY, C=US, OU=CWG, O=FIDO Alliance, EMAILADDRESS=conformance-tools@fidoalliance.org, CN=FIDO2 INTERMEDIATE prime256v1":
-                    certs.add((X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new FileInputStream(new File(certsLocation + "fido-conf-tool-ca-intermediate-cert.crt"))));
+                    certs.add((X509Certificate) CertificateFactory.getInstance("X509", provider).generateCertificate(new FileInputStream(new File(certsLocation + "fido-conf-tool-ca-intermediate-cert.crt"))));
                 case "L=Wakefield, ST=MY, C=US, OU=CWG, O=FIDO Alliance, EMAILADDRESS=conformance-tools@fidoalliance.org, CN=FIDO2 TEST ROOT":
-                    certs.add((X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(new FileInputStream(new File(certsLocation + "fido-conf-tool-ca-root-cert.crt"))));
+                    certs.add((X509Certificate) CertificateFactory.getInstance("X509", provider).generateCertificate(new FileInputStream(new File(certsLocation + "fido-conf-tool-ca-root-cert.crt"))));
                     break;
                 default:
                     throw new Fido2RPRuntimeException("Can't find certificate");

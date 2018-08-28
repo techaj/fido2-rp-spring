@@ -16,11 +16,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.mastercard.ess.fido2.ctap.AttestationConveyancePreference;
 import com.mastercard.ess.fido2.database.FIDO2AuthenticationRepository;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationEntity;
 import com.mastercard.ess.fido2.database.FIDO2RegistrationRepository;
 import com.mastercard.ess.fido2.database.RegistrationStatus;
 import com.mastercard.ess.fido2.service.AuthenticatorAttestationVerifier;
+import com.mastercard.ess.fido2.service.ChallengeGenerator;
 import com.mastercard.ess.fido2.service.ChallengeVerifier;
 import com.mastercard.ess.fido2.service.CommonVerifiers;
 import com.mastercard.ess.fido2.service.CredAndCounterData;
@@ -57,6 +59,9 @@ class AttestationService {
     DomainVerifier domainVerifier;
 
     @Autowired
+    ChallengeGenerator challengeGenerator;
+
+    @Autowired
     CommonVerifiers commonVerifiers;
     @Autowired
     private ObjectMapper om;
@@ -89,13 +94,14 @@ class AttestationService {
             new Fido2RPRuntimeException("Can't parse message");
         }
 
+
         commonVerifiers.verifyClientJSON(clientDataJSONNode);
         commonVerifiers.verifyClientJSONTypeIsCreate(clientDataJSONNode);
         JsonNode keyIdNode = params.get("id");
         String keyId = commonVerifiers.verifyBase64UrlString(keyIdNode);
 
 
-        String clientDataChallenge = clientDataJSONNode.get("challenge").asText();
+        String clientDataChallenge = base64UrlEncoder.withoutPadding().encodeToString(base64UrlDecoder.decode(clientDataJSONNode.get("challenge").asText()));
         LOGGER.info("Challenge {}", clientDataChallenge);
 //        String clientDataOrigin = clientDataJSONNode.get("origin").asText();
 
@@ -107,12 +113,12 @@ class AttestationService {
 
         domainVerifier.verifyDomain(credentialFound.getDomain(), clientDataJSONNode.get("origin").asText());
         CredAndCounterData attestationData = authenticatorAttestationVerifier.verifyAuthenticatorAttestationResponse(response, credentialFound);
-        credentialFound.setAttestationType(attestationData.getAttestationType());
+
         credentialFound.setUncompressedECPoint(attestationData.getUncompressedEcPoint());
-        credentialFound.setAttestationType(attestationData.getAttestationType());
         credentialFound.setStatus(RegistrationStatus.REGISTERED);
         credentialFound.setW3cAuthenticatorAttenstationResponse(response.toString());
         credentialFound.setSignatureAlgorithm(attestationData.getSignatureAlgorithm());
+        credentialFound.setCounter(attestationData.getCounters());
         if (attestationData.getCredId() != null) {
             credentialFound.setPublicKeyId(attestationData.getCredId());
         } else {
@@ -146,7 +152,6 @@ class AttestationService {
         } catch (MalformedURLException e) {
             host = documentDomain;
 //            throw new Fido2RPRuntimeException(e.getMessage());
-
         }
 
 
@@ -159,14 +164,14 @@ class AttestationService {
 
 
         LOGGER.info("Options {} {} {}", username, displayName, documentDomain);
-        String attestationType = commonVerifiers.verifyAttestationType(params);
+        AttestationConveyancePreference attestationConveyancePreference = commonVerifiers.verifyAttestationConveyanceType(params);
+
 
 
         String credentialType = params.hasNonNull("credentialType") ? params.get("credentialType").asText("public-key") : "public-key";
         ObjectNode credentialCreationOptionsNode = om.createObjectNode();
-        byte buffer[] = new byte[32];
-        new SecureRandom().nextBytes(buffer);
-        String challenge = base64UrlEncoder.encodeToString(buffer);
+
+        String challenge = challengeGenerator.getChallenge();
         credentialCreationOptionsNode.put("challenge", challenge);
         LOGGER.info("Challenge {}", challenge);
         ObjectNode credentialRpEntityNode = credentialCreationOptionsNode.putObject("rp");
@@ -174,12 +179,13 @@ class AttestationService {
         credentialRpEntityNode.put("id", documentDomain);
 
         ObjectNode credentialUserEntityNode = credentialCreationOptionsNode.putObject("user");
+        byte[] buffer = new byte[32];
         new SecureRandom().nextBytes(buffer);
         String userId = base64UrlEncoder.encodeToString(buffer);
         credentialUserEntityNode.put("id", userId);
         credentialUserEntityNode.put("name", username);
         credentialUserEntityNode.put("displayName", displayName);
-        credentialCreationOptionsNode.put("attestation", attestationType);
+        credentialCreationOptionsNode.put("attestation", attestationConveyancePreference.toString());
         ArrayNode credentialParametersArrayNode = credentialCreationOptionsNode.putArray("pubKeyCredParams");
         ObjectNode credentialParametersNode = credentialParametersArrayNode.addObject();
         if ("public-key".equals(credentialType)) {
@@ -205,9 +211,9 @@ class AttestationService {
         entity.setUsername(username);
         entity.setUserId(userId);
         entity.setChallenge(challenge);
-
         entity.setDomain(host);
         entity.setW3cCredentialCreationOptions(credentialCreationOptionsNode.toString());
+        entity.setAttestationConveyancePreferenceType(attestationConveyancePreference);
         registrationsRepository.save(entity);
         return credentialCreationOptionsNode;
     }
