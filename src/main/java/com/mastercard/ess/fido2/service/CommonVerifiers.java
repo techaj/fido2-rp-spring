@@ -357,7 +357,7 @@ public class CommonVerifiers {
     public String verifyThatNonEmptyString(JsonNode node) {
         String value = verifyThatString(node);
         if (StringUtils.isEmpty(value)) {
-            throw new Fido2RPRuntimeException("Invalid field " + node.fieldNames().next());
+            throw new Fido2RPRuntimeException("Invalid field " + node);
         } else {
             return value;
         }
@@ -370,14 +370,14 @@ public class CommonVerifiers {
 
         String data = verifyThatBinary(node);
         if (data.isEmpty()) {
-            throw new Fido2RPRuntimeException("Invalid field " + node.fieldNames().next());
+            throw new Fido2RPRuntimeException("Invalid field " + node);
         }
         return data;
     }
 
     public String verifyThatBinary(JsonNode node) {
         if (!node.isBinary()) {
-            throw new Fido2RPRuntimeException("Invalid field " + node.fieldNames().next());
+            throw new Fido2RPRuntimeException("Invalid field " + node);
         }
         return node.asText();
     }

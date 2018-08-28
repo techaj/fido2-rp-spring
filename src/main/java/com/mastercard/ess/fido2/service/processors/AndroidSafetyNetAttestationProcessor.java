@@ -83,7 +83,12 @@ public class AndroidSafetyNetAttestationProcessor implements AttestationFormatPr
         LOGGER.info("Android safetynet payload {} {}", aaguid, new String(base64Decoder.decode(response)));
 
         X509TrustManager tm = utils.populateTrustManager(authData);
-        AttestationStatement stmt = OfflineVerify.parseAndVerify(new String(base64Decoder.decode(response)), tm);
+        AttestationStatement stmt;
+        try {
+            stmt = OfflineVerify.parseAndVerify(new String(base64Decoder.decode(response)), tm);
+        } catch (Exception e) {
+            throw new Fido2RPRuntimeException("Invalid safety net attestation " + e.getMessage());
+        }
 
         if (stmt == null) {
             throw new Fido2RPRuntimeException("Invalid safety net attestation ");
