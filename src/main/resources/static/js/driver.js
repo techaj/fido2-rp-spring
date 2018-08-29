@@ -129,50 +129,55 @@ function processRegisterForm(e) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify(formBody)
-    })
-        .then((response) => response.json())
-        .then((response) => {
-                if (response.status !== 'ok')
-                    throw new Error(`Server responed with error. The message is: ${response.message}`);
-                let v = preformatMakeCredReq(response);
-                console.info("Updated Response from FIDO RP server ", v)
-                console.info("RP Domain = ", rpid)
-                v.rp.id = rpid;
-                navigator.credentials.create({publicKey: v})
-                    .then(function (aNewCredentialInfo) {
-                        var response = publicKeyCredentialToJSON(aNewCredentialInfo);
-                        console.info("response = " + response)
-                        console.info("response = " + JSON.stringify(response))
-                        fetch('/attestation/result', {
-                                method: 'POST',
-                                credentials: 'include',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify(response)
-                            }
-                        ).then(
-                            response => {
-                                response.json().then(
-                                    data => {
-                                        if (response.status === 200) {
-                                            displaySuccess("Successful registration!")
-                                            goHome();
-                                        } else {
-                                            displayError(data)
-                                        }
+    }).then(
+        response => {
+            response.json().then(
+                data => {
+                    if (response.status === 200) {
+                        console.log(data);
+                        let v = preformatMakeCredReq(data);
+                        console.info("Updated Response from FIDO RP server ", v)
+                        console.info("RP Domain = ", rpid)
+                        v.rp.id = rpid;
+                        navigator.credentials.create({publicKey: v})
+                            .then(function (aNewCredentialInfo) {
+                                var response = publicKeyCredentialToJSON(aNewCredentialInfo);
+                                console.info("response = " + response)
+                                console.info("response = " + JSON.stringify(response))
+                                fetch('/attestation/result', {
+                                        method: 'POST',
+                                        credentials: 'include',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(response)
+                                    }
+                                ).then(
+                                    response => {
+                                        response.json().then(
+                                            data => {
+                                                if (response.status === 200) {
+                                                    displaySuccess("Successful registration! ")
+                                                    $('#successMessage').append('<a href="./login.html">Click here to log in</a>');
+                                                } else {
+                                                    displayError(data)
+                                                }
+                                            }
+                                        )
                                     }
                                 )
+                            }).catch(function (error) {
+                                console.error("respones = " + error)
                             }
                         )
-                    }).catch(function (error) {
-                        console.error("respones = " + error)
                     }
-                )
-
-            }
-        )
-
+                    else {
+                        displayError(`Server responed with error. The message is: ${response.message}`);
+                    }
+                }
+            )
+        }
+    )
     return false;
 }
 
@@ -197,42 +202,49 @@ function processLoginForm(e) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify(formBody)
-    })
-        .then((response) => response.json())
-        .then((response) => {
-            if (response.status !== 'ok')
-                throw new Error(`Server responed with error. The message is: ${response.message}`);
-            console.info("Updated Response from FIDO RP server ", response)
-            var resp = preformatGetAssertReq(response)
-            console.info("Updated Response from FIDO RP server ", resp)
-            navigator.credentials.get({publicKey: resp})
-                .then(function (aAssertion) {
-                    var resp = JSON.stringify(publicKeyCredentialToJSON(aAssertion));
-                    console.info("Get Assertion Response " + response);
-                    fetch('/assertion/result', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: resp
-                    }).then(
-                        response => {
-                            response.json().then(
-                                data => {
-                                    if (response.status === 200) {
-                                        displaySuccess("Successful match [" + data.status + "-" + data.type + "]");
-                                    } else {
-                                        displayError("Failure [" + data.status + "-" + data.type + "]");
-                                    }
+    }).then(
+        response => {
+            response.json().then(
+                data => {
+                    if (response.status === 200) {
+                        console.info("Updated Response from FIDO RP server ", data)
+                        var resp = preformatGetAssertReq(data)
+                        console.info("Updated Response from FIDO RP server ", resp)
+                        var key = navigator.credentials.get({publicKey: resp})
+                        key.then(aAssertion => {
+                            console.log(aAssertion)
+                            var resp = JSON.stringify(publicKeyCredentialToJSON(aAssertion));
+                            console.info("Get Assertion Response " + data);
+                            fetch('/assertion/result', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: resp
+                            }).then(
+                                response => {
+                                    response.json().then(
+                                        data => {
+                                            if (response.status === 200) {
+                                                displaySuccess("Successful match [" + data.status + "]");
+                                            } else {
+                                                displayError("Failure [" + data.status + "-" + data.errorMessage + "]");
+                                            }
+                                        }
+                                    )
                                 }
                             )
-                        }
-                    )
-                }).catch(function (aErr) {
-                console.info("Unable to get Assertion Response ", JSON.stringify(aErr))
-            });
-        });
+                        }).catch(function (aErr) {
+                            displayError("Unable to get Assertion Response ", JSON.stringify(aErr));
+                        });
+                    } else {
+                        displayError(`Server responed with error. The message is: ${data.errorMessage}`);
+                    }
+                }
+            )
+        }
+    )
 }
 
 
