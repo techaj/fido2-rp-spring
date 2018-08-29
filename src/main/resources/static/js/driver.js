@@ -2,26 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-
-//require(['base64url-browser']), function (base64url-browser) {    //foo is now loaded.
-//});
-
-
-var TIMEOUT = 2000; // ms
-
-function b64dec(str) {
-    if (str.length % 4 == 1) {
-        throw "Improper b64 string";
-    }
-
-    var b64 = str;
-    while (b64.length % 4 != 0) {
-        b64 += "=";
-    }
-    return new Uint8Array(base64js.toByteArray(b64));
-}
-
-
 var preformatMakeCredReq = (makeCredReq) => {
     console.info("Updating credentials ", makeCredReq)
     makeCredReq.challenge = base64url.decode(makeCredReq.challenge);
