@@ -60,22 +60,13 @@
         <div class="glyphicon glyphicon-remove"></div>
         <div id="successMessage"></div>
     </div>
-
-    <div class="card-group">
-        <div class="card" style="width: 18rem;">
-            <div class="card-body">
-                <h5 class="card-title">Registration</h5>
-                <p class="card-text">To test the login function you must first register yourself within the system</p>
-                <p class="card-text"><a href="./register.html">Register</a></p>
-            </div>
-        </div>
-        <div class="card" style="width: 18rem;">
-            <div class="card-body">
-                <h5 class="card-title">Login</h5>
-                <p class="card-text">Already registered? Test the login function of your authenticator</p>
-                <p class="card-text"><a href="./login.html">Login</a></p>
-            </div>
-        </div>
+    <div class="row marketing">
+        <form id="loginForm" class="form-signin">
+            <h2 class="form-signin-heading">Login</h2>
+            <label for="loginUsername" class="sr-only">Username</label>
+            <input type="text" id="loginUsername" class="form-control" placeholder="Username" required="" autofocus="">
+            <button class="btn btn-lg btn-primary btn-block" type="submit">Login</button>
+        </form>
     </div>
 
     <footer class="footer">
