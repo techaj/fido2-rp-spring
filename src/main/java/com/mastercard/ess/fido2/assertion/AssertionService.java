@@ -141,6 +141,9 @@ class AssertionService {
 
         ObjectNode assertionOptionsResponseNode = om.createObjectNode();
         List<FIDO2RegistrationEntity> registrations = registrationsRepository.findAllByUsername(username);
+        if (registrations.isEmpty()) {
+            throw new Fido2RPRuntimeException("No record of registration. Have you registered");
+        }
 
 
         String challenge = challengeGenerator.getChallenge();

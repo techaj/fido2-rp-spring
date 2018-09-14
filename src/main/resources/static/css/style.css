@@ -170,3 +170,15 @@ a:focus {
 footer a:hover {
     color: #e87600;
 }
+
+.btn-primary {
+    background-color: #e87600;
+    border-color: #e87600;
+}
+
+.form-control:focus {
+    border: 1px solid #e87600;
+    box-shadow: 0 0 3px #e87600;
+    -moz-box-shadow: 0 0 3px #e87600;
+    -webkit-box-shadow: 0 0 3px #e87600;
+}
